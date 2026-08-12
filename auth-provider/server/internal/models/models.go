@@ -1,3 +1,4 @@
+// Package models contains database schema
 package models
 
 import (
