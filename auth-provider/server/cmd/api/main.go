@@ -1,37 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"os"
 
+	"github.com/danarrigo/scaean-gate/auth-provider/server/config"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/database"
+	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/handler"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
-func getEnv(key, fallback string) string {
-	if val, ok := os.LookupEnv(key); ok && val != "" {
-		return val
-	}
-	return fallback
-}
-
 func main() {
-	dbHost := getEnv("DB_HOST", "localhost")
-	dbPort := getEnv("DB_PORT", "5432")
-	dbUser := getEnv("DB_USER", "sso_user")
-	dbPassword := getEnv("DB_PASSWORD", "sso_password")
-	dbName := getEnv("DB_NAME", "sso_db")
-	dbSSLMode := getEnv("DB_SSLMODE", "disable")
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load configuration: %v", err)
+	}
 
-	serverPort := getEnv("PORT", getEnv("SERVER_PORT", "8080"))
-
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
-		dbHost, dbUser, dbPassword, dbName, dbPort, dbSSLMode)
-
-	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
 	}
@@ -41,11 +27,12 @@ func main() {
 	}
 
 	if err := database.Seed(db); err != nil {
-		log.Fatalf("failed to seed columns: %v", err)
+		log.Fatalf("failed to seed database: %v", err)
 	}
 
 	r := gin.Default()
-	if err := r.Run(":" + serverPort); err != nil {
+	r.POST("/login", handler.LoginHandler(db))
+	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}
 }

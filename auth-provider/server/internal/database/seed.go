@@ -31,7 +31,7 @@ func Seed(db *gorm.DB) error {
 
 	seedPassword := os.Getenv("SEED_USER_PASSWORD")
 	if seedPassword == "" {
-		seedPassword = "password123"
+		return fmt.Errorf("missing required environment variable: SEED_USER_PASSWORD")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(seedPassword), bcrypt.DefaultCost)

@@ -1,0 +1,31 @@
+# Documentation / PRD
+PRD.md
+Agents.md
+AGENTS.md
+auth-provider/server/FOLDER_STRUCTURE.md
+FOLDER_STRUCTURE.md
+
+
+# Environment variables
+.env
+*.env
+
+# Go build artifacts & binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+dist/
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
