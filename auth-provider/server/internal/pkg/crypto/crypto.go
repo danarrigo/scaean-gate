@@ -19,3 +19,4 @@ func HashSHA256(input string)string{
 	hashedBytes := sha256.Sum256([]byte(input))
 	return hex.EncodeToString(hashedBytes[:])
 }
+

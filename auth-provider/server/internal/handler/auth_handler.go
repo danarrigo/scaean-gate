@@ -46,6 +46,13 @@ func (u *UserHandler)Logout(c *gin.Context){
 		response.Error(c,http.StatusUnauthorized,"UNAUTHORIZED","No active session")
 		return 
 	}
+	if err:=u.AuthSvc.Logout(cookie,c.ClientIP()); err!=nil{
+		response.HandleError(c,err)
+		return 
+	}
+
+	c.SetCookie("sso_session","",-1,"/","",false,true)
+	response.JSON(c,http.StatusOK,gin.H{"message":"logout succesfful"})
 
 }
 

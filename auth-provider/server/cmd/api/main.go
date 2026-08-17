@@ -47,6 +47,7 @@ func main() {
 
 	r := gin.Default()
 	r.POST("/login", userHandler.LoginHandler)
+	r.POST("/logout", userHandler.Logout)
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}

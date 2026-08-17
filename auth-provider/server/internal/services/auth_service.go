@@ -85,6 +85,31 @@ func (s *AuthService) Login(email, password, ipAddress, userAgent string) (*Logi
 	}, nil
 }
 
+func (s *AuthService) Logout(cookie, ipAddress string) error {
+	hashedToken := crypto.HashSHA256(cookie)
+	ssoSession, err := s.SessionRepo.GetSSOSessionByHash(hashedToken)
+	if err != nil {
+		return response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid Session")
+	}
+
+	event := models.Event{
+		EventType:        "SessionRevoked",
+		UserID:           ssoSession.UserID,
+		CentralSessionID: &ssoSession.ID,
+		Payload:          `{"reason":"USER_LOGOUT"}`,
+		Status:           "pending",
+		CreatedAt:        time.Now(),
+	}
+
+	if err := s.SessionRepo.RevokeSSOSessionWithEvent(ssoSession.ID, "USER_LOGOUT", &event); err != nil {
+		return err
+	}
+
+	s.AuditSvc.Log("LOGOUT", &ssoSession.UserID, &ssoSession.UserID, nil, &ssoSession.ID, "success", ipAddress, "")
+	return nil
+}
+
+
 func (s *AuthService) GetUserByEmail(email string) (models.User, error) {
 	return s.UserRepo.GetUserByEmail(email)
 }
@@ -99,3 +124,4 @@ func (s *AuthService) ValidateUserPassword(hashedPassword string, password strin
 func (s *AuthService) CreateSession(session *models.SSOSession) error {
 	return s.SessionRepo.CreateSSOSession(session)
 }
+
