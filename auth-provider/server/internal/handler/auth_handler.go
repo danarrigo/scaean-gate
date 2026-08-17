@@ -56,8 +56,27 @@ func (u *UserHandler)Logout(c *gin.Context){
 
 }
 
-func ChangePassword(c *gin.Context) {
+func (u *UserHandler) ChangePassword(c *gin.Context) {
+	cookie, err := c.Cookie("sso_session")
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "No active session")
+		return
+	}
+
+	var body dto.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&body); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		return
+	}
+
+	if err := u.AuthSvc.ChangePassword(cookie, body, c.ClientIP()); err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	c.SetCookie("sso_session", "", -1, "/", "", false, true)
+	response.JSON(c, http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 
-func ShowProfile(c *gin.Context) {
+func (u *UserHandler) ShowProfile(c *gin.Context) {
 }

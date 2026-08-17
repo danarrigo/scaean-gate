@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/dto"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/pkg/crypto"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/pkg/response"
@@ -106,6 +107,60 @@ func (s *AuthService) Logout(cookie, ipAddress string) error {
 	}
 
 	s.AuditSvc.Log("LOGOUT", &ssoSession.UserID, &ssoSession.UserID, nil, &ssoSession.ID, "success", ipAddress, "")
+	return nil
+}
+
+func (s *AuthService) ChangePassword(cookie string, req dto.ChangePasswordRequest, ipAddress string) error {
+	var (
+		userID *uuid.UUID
+		result = "failed"
+		reason = ""
+	)
+
+	defer func() {
+		s.AuditSvc.Log("PASSWORD_CHANGED", userID, userID, nil, nil, result, ipAddress, reason)
+	}()
+
+	hashedToken := crypto.HashSHA256(cookie)
+	session, err := s.SessionRepo.GetSSOSessionByHash(hashedToken)
+	if err != nil {
+		reason = "UNAUTHORIZED"
+		return response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired session")
+	}
+
+	userID = &session.UserID
+
+	user, err := s.UserRepo.GetUserByID(session.UserID)
+	if err != nil {
+		reason = "USER_NOT_FOUND"
+		return response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "User not found")
+	}
+
+	if err := crypto.ValidateUserPassword(req.OldPassword, user.PasswordHash); err != nil {
+		reason = "INVALID_CREDENTIALS"
+		return response.NewAppError(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Incorrect old password")
+	}
+
+	newPasswordHash, err := crypto.HashPassword(req.NewPassword)
+	if err != nil {
+		reason = "INTERNAL_ERROR"
+		return err
+	}
+
+	event := models.Event{
+		EventType: "PasswordChanged",
+		UserID:    user.ID,
+		Payload:   `{"reason":"PASSWORD_CHANGED"}`,
+		Status:    "pending",
+		CreatedAt: time.Now(),
+	}
+
+	if err := s.UserRepo.ChangePasswordTx(user.ID, newPasswordHash, &event); err != nil {
+		reason = "INTERNAL_ERROR"
+		return err
+	}
+
+	result = "success"
 	return nil
 }
 
