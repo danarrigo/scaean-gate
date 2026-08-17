@@ -79,4 +79,17 @@ func (u *UserHandler) ChangePassword(c *gin.Context) {
 }
 
 func (u *UserHandler) ShowProfile(c *gin.Context) {
+	cookie, err := c.Cookie("sso_session")
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "No active session")
+		return
+	}
+
+	profile, err := u.AuthSvc.GetProfile(cookie)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	response.JSON(c, http.StatusOK, dto.ProfileResponse{User: *profile})
 }

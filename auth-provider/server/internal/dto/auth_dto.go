@@ -26,3 +26,14 @@ type ChangePasswordRequest struct {
 	NewPassword string `json:"newPassword" binding:"required,min=6"`
 }
 
+type ProfileData struct {
+	ID     uuid.UUID `json:"id"`
+	Name   string    `json:"name"`
+	Email  string    `json:"email"`
+	Groups []string  `json:"groups"`
+}
+
+type ProfileResponse struct {
+	User ProfileData `json:"user"`
+}
+

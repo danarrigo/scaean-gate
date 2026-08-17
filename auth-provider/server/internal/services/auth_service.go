@@ -164,6 +164,31 @@ func (s *AuthService) ChangePassword(cookie string, req dto.ChangePasswordReques
 	return nil
 }
 
+func (s *AuthService) GetProfile(cookie string) (*dto.ProfileData, error) {
+	hashedToken := crypto.HashSHA256(cookie)
+	session, err := s.SessionRepo.GetSSOSessionByHash(hashedToken)
+	if err != nil {
+		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired session")
+	}
+
+	user, err := s.UserRepo.GetUserWithGroupsByID(session.UserID)
+	if err != nil {
+		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "User not found")
+	}
+
+	groups := make([]string, 0, len(user.Groups))
+	for _, g := range user.Groups {
+		groups = append(groups, g.Name)
+	}
+
+	return &dto.ProfileData{
+		ID:     user.ID,
+		Name:   user.Name,
+		Email:  user.Email,
+		Groups: groups,
+	}, nil
+}
+
 
 func (s *AuthService) GetUserByEmail(email string) (models.User, error) {
 	return s.UserRepo.GetUserByEmail(email)

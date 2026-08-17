@@ -29,6 +29,14 @@ func (r *UserRepository) GetUserByID(id uuid.UUID) (models.User, error) {
 	return user, nil
 }
 
+func (r *UserRepository) GetUserWithGroupsByID(id uuid.UUID) (models.User, error) {
+	var user models.User
+	if err := r.DB.Preload("Groups").Where("id = ?", id).First(&user).Error; err != nil {
+		return models.User{}, err
+	}
+	return user, nil
+}
+
 func (r *UserRepository) ChangePasswordTx(userID uuid.UUID, newPasswordHash string, event *models.Event) error {
 	return r.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Model(&models.User{}).Where("id = ?", userID).Update("password_hash", newPasswordHash).Error; err != nil {

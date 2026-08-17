@@ -49,6 +49,7 @@ func main() {
 	r.POST("/login", userHandler.LoginHandler)
 	r.POST("/logout", userHandler.Logout)
 	r.POST("/change-password", userHandler.ChangePassword)
+	r.GET("/profile", userHandler.ShowProfile)
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}
