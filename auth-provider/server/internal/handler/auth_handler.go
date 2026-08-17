@@ -41,7 +41,12 @@ func (u *UserHandler) LoginHandler(c *gin.Context) {
 	})
 }
 
-func Logout(c *gin.Context) {
+func (u *UserHandler)Logout(c *gin.Context){
+	cookie,err:= c.Cookie("sso_session");if err!= nil{
+		response.Error(c,http.StatusUnauthorized,"UNAUTHORIZED","No active session")
+		return 
+	}
+
 }
 
 func ChangePassword(c *gin.Context) {

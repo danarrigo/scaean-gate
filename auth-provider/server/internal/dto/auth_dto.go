@@ -1,5 +1,4 @@
 // Package dto consists of Data Transfer Objects
-// agy --conversation=92ac2d4d-af5a-4063-8677-df3f6760f5d5
 package dto
 
 import (
@@ -21,3 +20,4 @@ type LoginResponse struct {
 	Message string   `json:"message"`
 	User    UserData `json:"user"`
 }
+

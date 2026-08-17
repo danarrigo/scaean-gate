@@ -34,9 +34,12 @@ func main() {
 
 	userRepo := repository.UserRepository{DB: db}
 	sessionRepo := repository.SessionRepository{DB: db}
+	auditRepo := repository.AuditRepository{DB: db}
+	auditSvc := services.AuditService{Repo: auditRepo}
 	authSvc := services.AuthService{
 		UserRepo:    userRepo,
 		SessionRepo: sessionRepo,
+		AuditSvc:    auditSvc,
 	}
 	userHandler := handler.UserHandler{
 		AuthSvc: authSvc,

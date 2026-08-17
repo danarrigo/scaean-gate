@@ -2,15 +2,14 @@
 package services
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"net/http"
 	"time"
 
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
+	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/pkg/crypto"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/pkg/response"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/repository"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -22,28 +21,46 @@ type LoginResult struct {
 type AuthService struct {
 	UserRepo    repository.UserRepository
 	SessionRepo repository.SessionRepository
+	AuditSvc    AuditService
 }
 
 func (s *AuthService) Login(email, password, ipAddress, userAgent string) (*LoginResult, error) {
+	var (
+		userID    *uuid.UUID
+		sessionID *uuid.UUID
+		result    = "failed"
+		reason    = ""
+	)
+
+	defer func() {
+		s.AuditSvc.Log("LOGIN", userID, userID, nil, sessionID, result, ipAddress, reason)
+	}()
+
 	user, err := s.UserRepo.GetUserByEmail(email)
 	if err != nil {
+		reason = "INVALID_CREDENTIALS"
 		return nil, response.NewAppError(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
 	}
 
+	userID = &user.ID
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+		reason = "INVALID_CREDENTIALS"
 		return nil, response.NewAppError(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Invalid email or password")
 	}
 
 	if user.Status != "active" {
+		reason = "USER_INACTIVE"
 		return nil, response.NewAppError(http.StatusForbidden, "USER_INACTIVE", "User account is inactive")
 	}
 
-	rawToken, err := s.GenerateRandomString()
+	rawToken, err := crypto.GenerateRandomString()
 	if err != nil {
+		reason = "INTERNAL_ERROR"
 		return nil, err
 	}
 
-	sessionTokenHash := s.GenerateSessionToken(rawToken)
+	sessionTokenHash := crypto.HashSHA256(rawToken)
 
 	session := models.SSOSession{
 		UserID:           user.ID,
@@ -55,8 +72,12 @@ func (s *AuthService) Login(email, password, ipAddress, userAgent string) (*Logi
 	}
 
 	if err := s.SessionRepo.CreateSSOSession(&session); err != nil {
+		reason = "INTERNAL_ERROR"
 		return nil, err
 	}
+
+	sessionID = &session.ID
+	result = "success"
 
 	return &LoginResult{
 		User:     user,
@@ -73,22 +94,6 @@ func (s *AuthService) ValidateUserPassword(hashedPassword string, password strin
 		return err
 	}
 	return nil
-}
-
-func (s *AuthService) GenerateRandomString() (string, error) {
-	bytes := make([]byte, 32)
-	_, err := rand.Read(bytes)
-	if err != nil {
-		return "", err
-	}
-	randomString := hex.EncodeToString(bytes)
-	return randomString, nil
-}
-
-func (s *AuthService) GenerateSessionToken(rawToken string) string {
-	hashedBytes := sha256.Sum256([]byte(rawToken))
-	hashedString := hex.EncodeToString(hashedBytes[:])
-	return hashedString
 }
 
 func (s *AuthService) CreateSession(session *models.SSOSession) error {
