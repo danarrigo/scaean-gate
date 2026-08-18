@@ -1,4 +1,3 @@
-// Package response provides centralized HTTP response utilities
 package response
 
 import (
@@ -28,7 +27,11 @@ func NewAppError(statusCode int, code, message string) *AppError {
 }
 
 func Error(c *gin.Context, statusCode int, code, message string) {
-	c.JSON(statusCode, dto.NewErrorResponse(code, message))
+	resp := dto.NewErrorResponse(code, message)
+	if reqID := c.GetString("requestId"); reqID != "" {
+		resp.Error.RequestID = reqID
+	}
+	c.JSON(statusCode, resp)
 }
 
 func HandleError(c *gin.Context, err error) {

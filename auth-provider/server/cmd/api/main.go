@@ -6,6 +6,7 @@ import (
 	"github.com/danarrigo/scaean-gate/auth-provider/server/config"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/database"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/handler"
+	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/middleware"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/repository"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/services"
 	"github.com/gin-gonic/gin"
@@ -61,6 +62,8 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.Use(middleware.RequestIDMiddleware)
+	r.Use(middleware.CORSMiddleware)
 	r.POST("/login", authHandler.LoginHandler)
 	r.POST("/logout", authHandler.Logout)
 	r.POST("/change-password", authHandler.ChangePassword)
