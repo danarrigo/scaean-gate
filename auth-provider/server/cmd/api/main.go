@@ -36,20 +36,38 @@ func main() {
 	sessionRepo := repository.SessionRepository{DB: db}
 	auditRepo := repository.AuditRepository{DB: db}
 	auditSvc := services.AuditService{Repo: auditRepo}
+	appRepo := repository.AppRepository{DB: db}
+	policyRepo := repository.PolicyRepository{DB: db}
+	oauthRepo := repository.OAuthRepository{DB: db}
+
 	authSvc := services.AuthService{
 		UserRepo:    userRepo,
 		SessionRepo: sessionRepo,
 		AuditSvc:    auditSvc,
 	}
-	userHandler := handler.UserHandler{
+	oauthSvc := services.OauthService{
+		SessionRepo: sessionRepo,
+		UserRepo:    userRepo,
+		AppRepo:     appRepo,
+		PolicyRepo:  policyRepo,
+		OAuthRepo:   oauthRepo,
+	}
+
+	authHandler := handler.AuthHandler{
 		AuthSvc: authSvc,
+	}
+	oauthHandler := handler.OauthHandler{
+		OAuthSvc: oauthSvc,
 	}
 
 	r := gin.Default()
-	r.POST("/login", userHandler.LoginHandler)
-	r.POST("/logout", userHandler.Logout)
-	r.POST("/change-password", userHandler.ChangePassword)
-	r.GET("/profile", userHandler.ShowProfile)
+	r.POST("/login", authHandler.LoginHandler)
+	r.POST("/logout", authHandler.Logout)
+	r.POST("/change-password", authHandler.ChangePassword)
+	r.GET("/profile", authHandler.ShowProfile)
+	r.GET("/authorize", oauthHandler.Authorize)
+	r.POST("/token", oauthHandler.Token)
+	r.GET("/userinfo", oauthHandler.UserInfo)
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}

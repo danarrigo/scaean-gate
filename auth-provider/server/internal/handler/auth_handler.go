@@ -11,18 +11,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type UserHandler struct {
+type AuthHandler struct {
 	AuthSvc services.AuthService
 }
 
-func (u *UserHandler) LoginHandler(c *gin.Context) {
+func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	var body dto.LoginRequest
 	if err := c.ShouldBindJSON(&body); err != nil {
 		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
 		return
 	}
 
-	result, err := u.AuthSvc.Login(body.Email, body.Password, c.ClientIP(), c.Request.UserAgent())
+	result, err := h.AuthSvc.Login(body.Email, body.Password, c.ClientIP(), c.Request.UserAgent())
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -41,22 +41,22 @@ func (u *UserHandler) LoginHandler(c *gin.Context) {
 	})
 }
 
-func (u *UserHandler)Logout(c *gin.Context){
-	cookie,err:= c.Cookie("sso_session");if err!= nil{
-		response.Error(c,http.StatusUnauthorized,"UNAUTHORIZED","No active session")
-		return 
+func (h *AuthHandler) Logout(c *gin.Context) {
+	cookie, err := c.Cookie("sso_session")
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "No active session")
+		return
 	}
-	if err:=u.AuthSvc.Logout(cookie,c.ClientIP()); err!=nil{
-		response.HandleError(c,err)
-		return 
+	if err := h.AuthSvc.Logout(cookie, c.ClientIP()); err != nil {
+		response.HandleError(c, err)
+		return
 	}
 
-	c.SetCookie("sso_session","",-1,"/","",false,true)
-	response.JSON(c,http.StatusOK,gin.H{"message":"logout succesfful"})
-
+	c.SetCookie("sso_session", "", -1, "/", "", false, true)
+	response.JSON(c, http.StatusOK, gin.H{"message": "logout successful"})
 }
 
-func (u *UserHandler) ChangePassword(c *gin.Context) {
+func (h *AuthHandler) ChangePassword(c *gin.Context) {
 	cookie, err := c.Cookie("sso_session")
 	if err != nil {
 		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "No active session")
@@ -69,7 +69,7 @@ func (u *UserHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := u.AuthSvc.ChangePassword(cookie, body, c.ClientIP()); err != nil {
+	if err := h.AuthSvc.ChangePassword(cookie, body, c.ClientIP()); err != nil {
 		response.HandleError(c, err)
 		return
 	}
@@ -78,14 +78,14 @@ func (u *UserHandler) ChangePassword(c *gin.Context) {
 	response.JSON(c, http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 
-func (u *UserHandler) ShowProfile(c *gin.Context) {
+func (h *AuthHandler) ShowProfile(c *gin.Context) {
 	cookie, err := c.Cookie("sso_session")
 	if err != nil {
 		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "No active session")
 		return
 	}
 
-	profile, err := u.AuthSvc.GetProfile(cookie)
+	profile, err := h.AuthSvc.GetProfile(cookie)
 	if err != nil {
 		response.HandleError(c, err)
 		return
