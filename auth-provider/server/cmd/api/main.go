@@ -35,12 +35,13 @@ func main() {
 
 	userRepo := repository.UserRepository{DB: db}
 	sessionRepo := repository.SessionRepository{DB: db}
-	auditRepo := repository.AuditRepository{DB: db}
-	auditSvc := services.AuditService{Repo: auditRepo}
+	groupRepo := repository.GroupRepository{DB: db}
 	appRepo := repository.AppRepository{DB: db}
 	policyRepo := repository.PolicyRepository{DB: db}
 	oauthRepo := repository.OAuthRepository{DB: db}
+	auditRepo := repository.AuditRepository{DB: db}
 
+	auditSvc := services.AuditService{Repo: auditRepo}
 	authSvc := services.AuthService{
 		UserRepo:    userRepo,
 		SessionRepo: sessionRepo,
@@ -53,6 +54,14 @@ func main() {
 		PolicyRepo:  policyRepo,
 		OAuthRepo:   oauthRepo,
 	}
+	adminSvc := services.AdminService{
+		UserRepo:    userRepo,
+		SessionRepo: sessionRepo,
+		GroupRepo:   groupRepo,
+		AppRepo:     appRepo,
+		PolicyRepo:  policyRepo,
+		AuditRepo:   auditRepo,
+	}
 
 	authHandler := handler.AuthHandler{
 		AuthSvc: authSvc,
@@ -60,12 +69,31 @@ func main() {
 	oauthHandler := handler.OauthHandler{
 		OAuthSvc: oauthSvc,
 	}
+	userHandler := handler.UserHandler{
+		AdminSvc: adminSvc,
+	}
+	groupHandler := handler.GroupHandler{
+		AdminSvc: adminSvc,
+	}
+	appHandler := handler.AppHandler{
+		AdminSvc: adminSvc,
+	}
+	policyHandler := handler.PolicyHandler{
+		AdminSvc: adminSvc,
+	}
+	auditHandler := handler.AuditHandler{
+		AdminSvc: adminSvc,
+	}
+	authMiddleware := middleware.AuthMiddlewareHandler{
+		AuthSvc: adminSvc,
+	}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestIDMiddleware)
 	r.Use(middleware.CORSMiddleware)
 	r.Use(middleware.LoggerMiddleware)
+
 	r.POST("/login", authHandler.LoginHandler)
 	r.POST("/logout", authHandler.Logout)
 	r.POST("/change-password", authHandler.ChangePassword)
@@ -73,6 +101,41 @@ func main() {
 	r.GET("/authorize", oauthHandler.Authorize)
 	r.POST("/token", oauthHandler.Token)
 	r.GET("/userinfo", oauthHandler.UserInfo)
+
+	admin := r.Group("/admin")
+	admin.Use(authMiddleware.AuthMiddleWare)
+	{
+		admin.GET("/users", userHandler.ListUsers)
+		admin.POST("/users", userHandler.CreateUser)
+		admin.GET("/users/:id", userHandler.GetUser)
+		admin.PUT("/users/:id", userHandler.UpdateUser)
+		admin.DELETE("/users/:id", userHandler.DeleteUser)
+		admin.PATCH("/users/:id/status", userHandler.UpdateUserStatus)
+
+		admin.GET("/groups", groupHandler.ListGroups)
+		admin.POST("/groups", groupHandler.CreateGroup)
+		admin.GET("/groups/:id", groupHandler.GetGroup)
+		admin.PUT("/groups/:id", groupHandler.UpdateGroup)
+		admin.DELETE("/groups/:id", groupHandler.DeleteGroup)
+		admin.POST("/groups/:id/users", groupHandler.AssignUser)
+		admin.DELETE("/groups/:id/users/:user_id", groupHandler.UnassignUser)
+
+		admin.GET("/apps", appHandler.ListApps)
+		admin.POST("/apps", appHandler.CreateApp)
+		admin.GET("/apps/:id", appHandler.GetApp)
+		admin.PUT("/apps/:id", appHandler.UpdateApp)
+		admin.DELETE("/apps/:id", appHandler.DeleteApp)
+		admin.POST("/apps/:id/redirect-uris", appHandler.AddRedirectURI)
+		admin.DELETE("/apps/:id/redirect-uris/:uri_id", appHandler.DeleteRedirectURI)
+
+		admin.GET("/policies", policyHandler.ListPolicies)
+		admin.POST("/policies", policyHandler.CreatePolicy)
+		admin.DELETE("/policies/:id", policyHandler.DeletePolicy)
+
+		admin.GET("/audit-logs", auditHandler.ListAuditLogs)
+		admin.GET("/events", auditHandler.ListEvents)
+	}
+
 	if err := r.Run(":" + cfg.ServerPort); err != nil {
 		log.Fatalf("failed to run server: %v", err)
 	}
