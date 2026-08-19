@@ -61,9 +61,11 @@ func main() {
 		OAuthSvc: oauthSvc,
 	}
 
-	r := gin.Default()
+	r := gin.New()
+	r.Use(gin.Recovery())
 	r.Use(middleware.RequestIDMiddleware)
 	r.Use(middleware.CORSMiddleware)
+	r.Use(middleware.LoggerMiddleware)
 	r.POST("/login", authHandler.LoginHandler)
 	r.POST("/logout", authHandler.Logout)
 	r.POST("/change-password", authHandler.ChangePassword)
