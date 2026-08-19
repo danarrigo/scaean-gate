@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -19,4 +20,38 @@ func (r *PolicyRepository) HasUserAccess(userID uuid.UUID, appID uuid.UUID) (boo
 		return false, err
 	}
 	return count > 0, nil
+}
+
+func (r *PolicyRepository) ListPolicies() ([]models.ApplicationGroupPolicy, error) {
+	var policies []models.ApplicationGroupPolicy
+	if err := r.DB.Preload("Application").Preload("Group").Find(&policies).Error; err != nil {
+		return nil, err
+	}
+	return policies, nil
+}
+
+func (r *PolicyRepository) GetPolicyByID(id uuid.UUID) (models.ApplicationGroupPolicy, error) {
+	var policy models.ApplicationGroupPolicy
+	if err := r.DB.Preload("Application").Preload("Group").Where("id = ?", id).First(&policy).Error; err != nil {
+		return models.ApplicationGroupPolicy{}, err
+	}
+	return policy, nil
+}
+
+func (r *PolicyRepository) CreatePolicy(policy *models.ApplicationGroupPolicy) error {
+	return r.DB.Create(policy).Error
+}
+
+func (r *PolicyRepository) DeletePolicyTx(id uuid.UUID, event *models.Event) error {
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Delete(&models.ApplicationGroupPolicy{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+		if event != nil {
+			if err := tx.Create(event).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }

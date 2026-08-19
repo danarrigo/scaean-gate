@@ -31,7 +31,7 @@ func (s *OauthService) AuthorizeService(rawToken string, req dto.AuthorizeReques
 		return "", response.NewAppError(http.StatusForbidden, "FORBIDDEN", "User Inactive")
 	}
 
-	app, err := s.AppRepo.GetAppByID(req.ClientID)
+	app, err := s.AppRepo.GetAppByClientID(req.ClientID)
 	if err != nil || app.Status != "active" {
 		return "", response.NewAppError(http.StatusBadRequest, "INVALID_CLIENT", "Invalid Client")
 	}
@@ -95,7 +95,7 @@ func (s *OauthService) ExchangeToken(req dto.TokenRequest) (*dto.TokenResponse, 
 		return nil, response.NewAppError(http.StatusBadRequest, "INVALID_GRANT", "Invalid, expired, or already used authorization code")
 	}
 
-	app, err := s.AppRepo.GetAppByID(req.ClientID)
+	app, err := s.AppRepo.GetAppByClientID(req.ClientID)
 	if err != nil || app.ID != authCode.ApplicationID || app.Status != "active" {
 		return nil, response.NewAppError(http.StatusBadRequest, "INVALID_GRANT", "Invalid client")
 	}

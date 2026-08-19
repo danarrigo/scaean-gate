@@ -1,4 +1,3 @@
-// Package repository contains CRUD ops
 package repository
 
 import (
@@ -35,6 +34,56 @@ func (r *UserRepository) GetUserWithGroupsByID(id uuid.UUID) (models.User, error
 		return models.User{}, err
 	}
 	return user, nil
+}
+
+func (r *UserRepository) ListUsers() ([]models.User, error) {
+	var users []models.User
+	if err := r.DB.Preload("Groups").Find(&users).Error; err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+func (r *UserRepository) CreateUser(user *models.User, groupIDs []uuid.UUID) error {
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		if len(groupIDs) > 0 {
+			var groups []models.Group
+			if err := tx.Where("id IN ?", groupIDs).Find(&groups).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(user).Association("Groups").Replace(groups); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *UserRepository) UpdateUser(user *models.User, groupIDs []uuid.UUID) error {
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(user).Error; err != nil {
+			return err
+		}
+		if groupIDs != nil {
+			var groups []models.Group
+			if len(groupIDs) > 0 {
+				if err := tx.Where("id IN ?", groupIDs).Find(&groups).Error; err != nil {
+					return err
+				}
+			}
+			if err := tx.Model(user).Association("Groups").Replace(groups); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
+func (r *UserRepository) DeleteUser(id uuid.UUID) error {
+	return r.DB.Delete(&models.User{}, "id = ?", id).Error
 }
 
 func (r *UserRepository) ChangePasswordTx(userID uuid.UUID, newPasswordHash string, event *models.Event) error {
