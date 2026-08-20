@@ -1,7 +1,11 @@
 package repository
 
 import (
+	"time"
+
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
+	
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -27,4 +31,12 @@ func (r *AuditRepository) ListEvents() ([]models.Event, error) {
 		return nil, err
 	}
 	return events, nil
+}
+
+func (r *AuditRepository) MarkEventAsFinished(eventID uuid.UUID) error {
+	now := time.Now()
+	return r.DB.Model(&models.Event{}).Where("id = ?", eventID).Updates(map[string]any{
+		"status":       "published",
+		"published_at": &now,
+	}).Error
 }

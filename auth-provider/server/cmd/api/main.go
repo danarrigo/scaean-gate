@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 
+	"strings"
+
 	"github.com/danarrigo/scaean-gate/auth-provider/server/config"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/database"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/handler"
@@ -10,6 +12,7 @@ import (
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/repository"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/services"
 	"github.com/gin-gonic/gin"
+	"github.com/twmb/franz-go/pkg/kgo"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -41,11 +44,31 @@ func main() {
 	oauthRepo := repository.OAuthRepository{DB: db}
 	auditRepo := repository.AuditRepository{DB: db}
 
+	brokerList := strings.Split(cfg.KafkaBrokers, ",")
+	kafkaClient, err := kgo.NewClient(
+		kgo.SeedBrokers(brokerList...),
+	)
+	if err != nil {
+		log.Printf("failed to initialize kafka client: %v", err)
+	}
+	defer func() {
+		if kafkaClient != nil {
+			kafkaClient.Close()
+		}
+	}()
+
+	eventSvc := &services.EventService{
+		Client:    kafkaClient,
+		Topic:     "sso-session-events",
+		AuditRepo: auditRepo,
+	}
+
 	auditSvc := services.AuditService{Repo: auditRepo}
 	authSvc := services.AuthService{
 		UserRepo:    userRepo,
 		SessionRepo: sessionRepo,
 		AuditSvc:    auditSvc,
+		EventSvc:    eventSvc,
 	}
 	oauthSvc := services.OauthService{
 		SessionRepo: sessionRepo,
@@ -61,6 +84,7 @@ func main() {
 		AppRepo:     appRepo,
 		PolicyRepo:  policyRepo,
 		AuditRepo:   auditRepo,
+		EventSvc:    eventSvc,
 	}
 
 	authHandler := handler.AuthHandler{

@@ -16,6 +16,7 @@ type Config struct {
 	DBName           string
 	DBSSLMode        string
 	SeedUserPassword string
+	KafkaBrokers     string
 }
 
 func LoadConfig() (*Config, error) {
@@ -35,6 +36,7 @@ func LoadConfig() (*Config, error) {
 		DBName:           os.Getenv("DB_NAME"),
 		DBSSLMode:        getEnvWithDefault("DB_SSLMODE", "disable"),
 		SeedUserPassword: os.Getenv("SEED_USER_PASSWORD"),
+		KafkaBrokers:     getEnvWithDefault("KAFKA_BROKERS", "localhost:9092"),
 	}
 
 	if err := cfg.Validate(); err != nil {

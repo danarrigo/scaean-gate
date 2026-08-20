@@ -21,6 +21,7 @@ type AdminService struct {
 	AppRepo     repository.AppRepository
 	PolicyRepo  repository.PolicyRepository
 	AuditRepo   repository.AuditRepository
+	EventSvc    *EventService
 }
 
 func (s *AdminService) AdminAuth(cookie string) (*models.User, error) {
@@ -173,7 +174,15 @@ func (s *AdminService) UpdateUserStatus(userID uuid.UUID, status string) error {
 		}
 	}
 
-	return s.UserRepo.UpdateUserStatusTx(userID, status, event)
+	if err := s.UserRepo.UpdateUserStatusTx(userID, status, event); err != nil {
+		return err
+	}
+
+	if event != nil {
+		go s.EventSvc.PublishEvent(*event)
+	}
+
+	return nil
 }
 
 func (s *AdminService) ListGroups() ([]dto.GroupResponse, error) {
@@ -476,7 +485,13 @@ func (s *AdminService) DeletePolicy(id uuid.UUID) error {
 		Status:        "pending",
 	}
 
-	return s.PolicyRepo.DeletePolicyTx(id, &event)
+	if err := s.PolicyRepo.DeletePolicyTx(id, &event); err != nil {
+		return err
+	}
+
+	go s.EventSvc.PublishEvent(event)
+
+	return nil
 }
 
 func (s *AdminService) ListAuditLogs() ([]dto.AuditLogResponse, error) {

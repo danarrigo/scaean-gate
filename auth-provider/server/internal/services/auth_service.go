@@ -23,6 +23,7 @@ type AuthService struct {
 	UserRepo    repository.UserRepository
 	SessionRepo repository.SessionRepository
 	AuditSvc    AuditService
+	EventSvc    *EventService
 }
 
 func (s *AuthService) Login(email, password, ipAddress, userAgent string) (*LoginResult, error) {
@@ -106,6 +107,8 @@ func (s *AuthService) Logout(cookie, ipAddress string) error {
 		return err
 	}
 
+	go s.EventSvc.PublishEvent(event)
+
 	s.AuditSvc.Log("LOGOUT", &ssoSession.UserID, &ssoSession.UserID, nil, &ssoSession.ID, "success", ipAddress, "")
 	return nil
 }
@@ -159,6 +162,8 @@ func (s *AuthService) ChangePassword(cookie string, req dto.ChangePasswordReques
 		reason = "INTERNAL_ERROR"
 		return err
 	}
+
+	go s.EventSvc.PublishEvent(event)
 
 	result = "success"
 	return nil
