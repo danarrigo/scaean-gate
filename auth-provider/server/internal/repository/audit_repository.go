@@ -4,7 +4,7 @@ import (
 	"time"
 
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
-	
+
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

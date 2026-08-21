@@ -36,4 +36,3 @@ type ProfileData struct {
 type ProfileResponse struct {
 	User ProfileData `json:"user"`
 }
-

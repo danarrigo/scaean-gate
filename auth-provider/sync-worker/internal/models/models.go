@@ -38,11 +38,11 @@ func (Event) TableName() string {
 }
 
 type EventDelivery struct {
-	ID            uuid.UUID  `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	EventID       uuid.UUID  `gorm:"type:uuid;not null"`
-	ApplicationID uuid.UUID  `gorm:"type:uuid;not null"`
-	Status        string     `gorm:"type:varchar(50);not null;default:'pending'"`
-	AttemptCount  int        `gorm:"not null;default:0"`
+	ID            uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	EventID       uuid.UUID `gorm:"type:uuid;not null"`
+	ApplicationID uuid.UUID `gorm:"type:uuid;not null"`
+	Status        string    `gorm:"type:varchar(50);not null;default:'pending'"`
+	AttemptCount  int       `gorm:"not null;default:0"`
 	LastAttemptAt *time.Time
 	NextRetryAt   *time.Time
 	ProcessedAt   *time.Time

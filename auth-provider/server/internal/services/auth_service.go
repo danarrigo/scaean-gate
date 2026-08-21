@@ -194,7 +194,6 @@ func (s *AuthService) GetProfile(cookie string) (*dto.ProfileData, error) {
 	}, nil
 }
 
-
 func (s *AuthService) GetUserByEmail(email string) (models.User, error) {
 	return s.UserRepo.GetUserByEmail(email)
 }
@@ -209,4 +208,3 @@ func (s *AuthService) ValidateUserPassword(hashedPassword string, password strin
 func (s *AuthService) CreateSession(session *models.SSOSession) error {
 	return s.SessionRepo.CreateSSOSession(session)
 }
-
