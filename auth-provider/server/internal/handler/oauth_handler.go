@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/danarrigo/scaean-gate/auth-provider/server/config"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/dto"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/pkg/response"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/services"
@@ -14,6 +15,7 @@ import (
 
 type OauthHandler struct {
 	OAuthSvc services.OauthService
+	Cfg      *config.Config
 }
 
 func (h *OauthHandler) Authorize(c *gin.Context) {
@@ -26,7 +28,11 @@ func (h *OauthHandler) Authorize(c *gin.Context) {
 	rawToken, err := c.Cookie("sso_session")
 	if err != nil || rawToken == "" {
 		returnTo := url.QueryEscape(c.Request.RequestURI)
-		c.Redirect(http.StatusFound, fmt.Sprintf("/login?return_to=%s", returnTo))
+		frontendURL := "http://localhost:4200"
+		if h.Cfg != nil && h.Cfg.FrontendURL != "" {
+			frontendURL = h.Cfg.FrontendURL
+		}
+		c.Redirect(http.StatusFound, fmt.Sprintf("%s/login?return_to=%s", frontendURL, returnTo))
 		return
 	}
 

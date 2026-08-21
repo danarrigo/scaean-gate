@@ -67,7 +67,7 @@ func (s *AuthService) HandleCallback(ctx context.Context, code, verifier string)
 		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to prepare token request")
 	}
 
-	tokenReq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/token", s.Cfg.AuthProviderURL), bytes.NewBuffer(jsonBody))
+	tokenReq, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("%s/token", s.Cfg.AuthProviderInternalURL), bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to build token request")
 	}
@@ -88,7 +88,7 @@ func (s *AuthService) HandleCallback(ctx context.Context, code, verifier string)
 		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to parse token response")
 	}
 
-	userReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/userinfo", s.Cfg.AuthProviderURL), nil)
+	userReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/userinfo", s.Cfg.AuthProviderInternalURL), nil)
 	if err != nil {
 		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to build userinfo request")
 	}
@@ -190,9 +190,15 @@ func (s *AuthService) HandleBackChannelLogout(payload dto.BackChannelLogoutPaylo
 	}
 
 	if payload.CentralSessionID != nil && *payload.CentralSessionID != uuid.Nil {
-		_ = s.Repo.RevokeLocalSessionsByCentralSessionID(*payload.CentralSessionID, payload.Reason)
+		if err := s.Repo.RevokeLocalSessionsByCentralSessionID(*payload.CentralSessionID, payload.Reason); err != nil {
+			return response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to revoke local sessions")
+		}
 	} else if payload.UserID != uuid.Nil {
-		_ = s.Repo.RevokeLocalSessionsByUserID(payload.UserID, payload.Reason)
+		if err := s.Repo.RevokeLocalSessionsByUserID(payload.UserID, payload.Reason); err != nil {
+			return response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to revoke local sessions")
+		}
+	} else {
+		return response.NewAppError(http.StatusBadRequest, "INVALID_REQUEST", "Logout event has no session or user target")
 	}
 
 	processedEvent := models.ProcessedEvent{

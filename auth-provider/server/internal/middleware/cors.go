@@ -6,26 +6,28 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var allowedOrigins = map[string]bool{
-	"http://localhost:4200": true,
-	"http://localhost:4201": true,
-	"http://localhost:4202": true,
-}
-
-func CORSMiddleware(c *gin.Context) {
-	origin := c.GetHeader("Origin")
-
-	if allowedOrigins[origin] {
-		c.Header("Access-Control-Allow-Origin", origin)
-		c.Header("Access-Control-Allow-Credentials", "true")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, Accept, Origin")
-		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+func CORSMiddleware(origins []string) gin.HandlerFunc {
+	allowedOrigins := make(map[string]struct{}, len(origins))
+	for _, origin := range origins {
+		allowedOrigins[origin] = struct{}{}
 	}
 
-	if c.Request.Method == http.MethodOptions {
-		c.AbortWithStatus(http.StatusNoContent)
-		return
-	}
+	return func(c *gin.Context) {
+		origin := c.GetHeader("Origin")
+		if _, allowed := allowedOrigins[origin]; allowed {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Request-ID")
+			c.Header("Access-Control-Expose-Headers", "X-Request-ID")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			c.Header("Vary", "Origin")
+		}
 
-	c.Next()
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	}
 }

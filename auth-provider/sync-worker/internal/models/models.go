@@ -46,6 +46,7 @@ type EventDelivery struct {
 	LastAttemptAt *time.Time
 	NextRetryAt   *time.Time
 	ProcessedAt   *time.Time
+	LastError     string `gorm:"type:text"`
 }
 
 func (EventDelivery) TableName() string {

@@ -25,7 +25,6 @@ import { ApiService } from '../../services/api.service';
           <button [class.active]="activeTab === 'groups'" (click)="setTab('groups')">🏢 Groups</button>
           <button [class.active]="activeTab === 'apps'" (click)="setTab('apps')">🚀 Applications</button>
           <button [class.active]="activeTab === 'policies'" (click)="setTab('policies')">🛡️ Access Policies</button>
-          <button [class.active]="activeTab === 'sessions'" (click)="setTab('sessions')">⚡ Active Sessions</button>
           <button [class.active]="activeTab === 'audit'" (click)="setTab('audit')">📜 Audit Logs</button>
           <button [class.active]="activeTab === 'deliveries'" (click)="setTab('deliveries')">📨 Event Deliveries (DLQ)</button>
         </nav>
@@ -82,7 +81,7 @@ import { ApiService } from '../../services/api.service';
                           {{ u.status }}
                         </span>
                       </td>
-                      <td class="text-muted">{{ u.createdAt | date:'short' }}</td>
+                      <td class="text-muted">{{ u.created_at | date:'short' }}</td>
                       <td>
                         <button class="btn-xs" (click)="toggleUserStatus(u)">
                           {{ u.status === 'active' ? 'Deactivate' : 'Activate' }}
@@ -124,7 +123,6 @@ import { ApiService } from '../../services/api.service';
             <div class="section-card">
               <div class="card-header">
                 <h3>Registered Applications</h3>
-                <button class="btn-sm btn-primary" (click)="showAppModal = true">+ Register App</button>
               </div>
 
               <table class="data-table">
@@ -141,9 +139,9 @@ import { ApiService } from '../../services/api.service';
                   @for (a of applications; track a.id) {
                     <tr>
                       <td class="font-bold">{{ a.name }}</td>
-                      <td><code>{{ a.clientId }}</code></td>
-                      <td><a [href]="a.launchUrl" target="_blank">{{ a.launchUrl }}</a></td>
-                      <td><code>{{ a.logoutNotificationUrl }}</code></td>
+                      <td><code>{{ a.client_id }}</code></td>
+                      <td><a [href]="a.launch_url" target="_blank">{{ a.launch_url }}</a></td>
+                      <td><code>{{ a.logout_notification_url }}</code></td>
                       <td>
                         <span class="badge badge-active">{{ a.status }}</span>
                       </td>
@@ -174,8 +172,8 @@ import { ApiService } from '../../services/api.service';
                 <tbody>
                   @for (p of policies; track p.id) {
                     <tr>
-                      <td class="font-bold">{{ p.group?.name || p.groupId }}</td>
-                      <td>{{ p.application?.name || p.applicationId }}</td>
+                      <td class="font-bold">{{ p.group?.name || p.group_id }}</td>
+                      <td>{{ p.application?.name || p.application_id }}</td>
                       <td>
                         <span class="badge" [class.badge-active]="p.effect === 'allow'" [class.badge-danger]="p.effect !== 'allow'">
                           {{ p.effect | uppercase }}
@@ -183,51 +181,6 @@ import { ApiService } from '../../services/api.service';
                       </td>
                       <td>
                         <button class="btn-xs btn-danger" (click)="deletePolicy(p.id)">Revoke</button>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          }
-
-          <!-- SESSIONS TAB -->
-          @if (activeTab === 'sessions') {
-            <div class="section-card">
-              <div class="card-header">
-                <h3>Active SSO Sessions</h3>
-                <button class="btn-sm btn-outline" (click)="loadSessions()">🔄 Refresh</button>
-              </div>
-
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>User</th>
-                    <th>IP Address</th>
-                    <th>User Agent</th>
-                    <th>Created</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (s of sessions; track s.id) {
-                    <tr>
-                      <td class="font-bold">{{ s.user?.name || s.userId }}</td>
-                      <td><code>{{ s.ipAddress || '127.0.0.1' }}</code></td>
-                      <td class="text-muted text-sm">{{ s.userAgent || 'Web Browser' }}</td>
-                      <td class="text-muted">{{ s.createdAt | date:'short' }}</td>
-                      <td>
-                        <span class="badge" [class.badge-active]="s.status === 'active'" [class.badge-danger]="s.status !== 'active'">
-                          {{ s.status }}
-                        </span>
-                      </td>
-                      <td>
-                        @if (s.status === 'active') {
-                          <button class="btn-xs btn-danger" (click)="revokeSession(s.id)">Revoke Session</button>
-                        } @else {
-                          <span class="text-muted text-xs">Revoked</span>
-                        }
                       </td>
                     </tr>
                   }
@@ -256,14 +209,14 @@ import { ApiService } from '../../services/api.service';
                 <tbody>
                   @for (log of auditLogs; track log.id) {
                     <tr>
-                      <td class="text-muted">{{ log.createdAt | date:'medium' }}</td>
-                      <td class="font-bold">{{ log.eventType }}</td>
+                      <td class="text-muted">{{ log.created_at | date:'medium' }}</td>
+                      <td class="font-bold">{{ log.event_type }}</td>
                       <td>
                         <span class="badge" [class.badge-active]="log.result === 'success'" [class.badge-danger]="log.result !== 'success'">
                           {{ log.result }}
                         </span>
                       </td>
-                      <td><code>{{ log.ipAddress || '127.0.0.1' }}</code></td>
+                      <td><code>{{ log.ip_address || '127.0.0.1' }}</code></td>
                     </tr>
                   }
                 </tbody>
@@ -295,9 +248,9 @@ import { ApiService } from '../../services/api.service';
                     @if (e.deliveries && e.deliveries.length > 0) {
                       @for (d of e.deliveries; track d.id) {
                         <tr>
-                          <td class="font-bold">{{ e.eventType }}</td>
-                          <td class="text-muted">{{ e.createdAt | date:'short' }}</td>
-                          <td><code>{{ d.application?.name || d.applicationId }}</code></td>
+                          <td class="font-bold">{{ e.event_type }}</td>
+                          <td class="text-muted">{{ e.created_at | date:'short' }}</td>
+                          <td><code>{{ d.application?.name || d.application_id }}</code></td>
                           <td>
                             <span class="badge" 
                               [class.badge-succeeded]="d.status === 'succeeded'"
@@ -306,14 +259,14 @@ import { ApiService } from '../../services/api.service';
                               {{ d.status | uppercase }}
                             </span>
                           </td>
-                          <td><strong>{{ d.attemptCount }} / 5</strong></td>
-                          <td class="text-muted">{{ d.processedAt ? (d.processedAt | date:'short') : (d.nextRetryAt ? 'Next: ' + (d.nextRetryAt | date:'shortTime') : '-') }}</td>
+                          <td><strong>{{ d.attempt_count }} / 5</strong></td>
+                          <td class="text-muted">{{ d.processed_at ? (d.processed_at | date:'short') : (d.next_retry_at ? 'Next: ' + (d.next_retry_at | date:'shortTime') : '-') }}</td>
                         </tr>
                       }
                     } @else {
                       <tr>
-                        <td class="font-bold">{{ e.eventType }}</td>
-                        <td class="text-muted">{{ e.createdAt | date:'short' }}</td>
+                        <td class="font-bold">{{ e.event_type }}</td>
+                        <td class="text-muted">{{ e.created_at | date:'short' }}</td>
                         <td colspan="4" class="text-muted text-sm">Published to Kafka (Pending Sync Worker pickup)</td>
                       </tr>
                     }
@@ -772,7 +725,6 @@ export class DashboardComponent implements OnInit {
   groups: any[] = [];
   applications: any[] = [];
   policies: any[] = [];
-  sessions: any[] = [];
   auditLogs: any[] = [];
   events: any[] = [];
 
@@ -785,8 +737,6 @@ export class DashboardComponent implements OnInit {
   showPolicyModal = false;
   newPolicy = { groupId: '', applicationId: '', effect: 'allow' };
 
-  showAppModal = false;
-
   selectedGroup: any = null;
   groupMembers: any[] = [];
   selectedUserIdToAdd = '';
@@ -796,7 +746,6 @@ export class DashboardComponent implements OnInit {
     this.loadGroups();
     this.loadApps();
     this.loadPolicies();
-    this.loadSessions();
   }
 
   setTab(tab: string) {
@@ -805,7 +754,6 @@ export class DashboardComponent implements OnInit {
     if (tab === 'groups') this.loadGroups();
     if (tab === 'apps') this.loadApps();
     if (tab === 'policies') this.loadPolicies();
-    if (tab === 'sessions') this.loadSessions();
     if (tab === 'audit') this.loadAuditLogs();
     if (tab === 'deliveries') this.loadEvents();
   }
@@ -816,7 +764,6 @@ export class DashboardComponent implements OnInit {
       case 'groups': return 'Group & Team Management';
       case 'apps': return 'Registered Applications';
       case 'policies': return 'RBAC Access Policies';
-      case 'sessions': return 'Active Central SSO Sessions';
       case 'audit': return 'Security Audit Trail';
       case 'deliveries': return 'Sync Worker Event Deliveries (DLQ)';
       default: return 'Control Panel';
@@ -829,100 +776,135 @@ export class DashboardComponent implements OnInit {
   }
 
   loadUsers() {
-    this.api.getUsers().subscribe(res => this.users = res.data?.users || res.data || []);
+    this.api.getUsers().subscribe({
+      next: (res) => this.users = Array.isArray(res) ? res : (res?.data || []),
+      error: (err) => {
+        if (err.status === 401 || err.status === 403) {
+          this.router.navigate(['/login']);
+        }
+      }
+    });
   }
 
   toggleUserStatus(user: any) {
     const nextStatus = user.status === 'active' ? 'deactivated' : 'active';
-    this.api.updateUserStatus(user.id, nextStatus).subscribe(() => {
-      user.status = nextStatus;
-      this.showNotification(`User status updated to ${nextStatus}!`);
+    this.api.updateUserStatus(user.id, nextStatus).subscribe({
+      next: () => {
+        user.status = nextStatus;
+        this.showNotification(`User status updated to ${nextStatus}!`);
+      },
+      error: (err) => alert(err.error?.error?.message || 'Failed to update user status')
     });
   }
 
   createUser() {
-    this.api.createUser(this.newUser).subscribe(() => {
-      this.showUserModal = false;
-      this.newUser = { name: '', email: '', password: '' };
-      this.loadUsers();
-      this.showNotification('User created successfully!');
+    this.api.createUser(this.newUser).subscribe({
+      next: () => {
+        this.showUserModal = false;
+        this.newUser = { name: '', email: '', password: '' };
+        this.loadUsers();
+        this.showNotification('User created successfully!');
+      },
+      error: (err) => alert(err.error?.error?.message || 'Failed to create user')
     });
   }
 
   loadGroups() {
-    this.api.getGroups().subscribe(res => this.groups = res.data?.groups || res.data || []);
+    this.api.getGroups().subscribe({
+      next: (res) => this.groups = Array.isArray(res) ? res : (res?.data || []),
+      error: (err) => console.error('Failed to load groups:', err)
+    });
   }
 
   createGroup() {
-    this.api.createGroup(this.newGroup).subscribe(() => {
-      this.showGroupModal = false;
-      this.newGroup = { name: '', description: '' };
-      this.loadGroups();
-      this.showNotification('Group created successfully!');
+    this.api.createGroup(this.newGroup).subscribe({
+      next: () => {
+        this.showGroupModal = false;
+        this.newGroup = { name: '', description: '' };
+        this.loadGroups();
+        this.showNotification('Group created successfully!');
+      },
+      error: (err) => alert(err.error?.error?.message || 'Failed to create group')
     });
   }
 
   openGroupMembers(group: any) {
     this.selectedGroup = group;
-    this.api.getGroupMembers(group.id).subscribe(res => this.groupMembers = res.data?.members || res.data || []);
+    this.api.getGroup(group.id).subscribe({
+      next: (res) => this.groupMembers = res?.users || res?.members || [],
+      error: (err) => console.error('Failed to load group:', err)
+    });
   }
 
   addUserToGroup() {
     if (!this.selectedUserIdToAdd) return;
-    this.api.addGroupMember(this.selectedGroup.id, this.selectedUserIdToAdd).subscribe(() => {
-      this.openGroupMembers(this.selectedGroup);
-      this.selectedUserIdToAdd = '';
-      this.showNotification('Member added to group!');
+    this.api.addGroupMember(this.selectedGroup.id, this.selectedUserIdToAdd).subscribe({
+      next: () => {
+        this.openGroupMembers(this.selectedGroup);
+        this.selectedUserIdToAdd = '';
+        this.showNotification('Member added to group!');
+      },
+      error: (err) => alert(err.error?.error?.message || 'Failed to add member to group')
     });
   }
 
   removeUserFromGroup(userId: string) {
-    this.api.removeGroupMember(this.selectedGroup.id, userId).subscribe(() => {
-      this.openGroupMembers(this.selectedGroup);
-      this.showNotification('Member removed from group!');
+    this.api.removeGroupMember(this.selectedGroup.id, userId).subscribe({
+      next: () => {
+        this.openGroupMembers(this.selectedGroup);
+        this.showNotification('Member removed from group!');
+      },
+      error: (err) => alert(err.error?.error?.message || 'Failed to remove member')
     });
   }
 
   loadApps() {
-    this.api.getApps().subscribe(res => this.applications = res.data?.applications || res.data || []);
+    this.api.getApps().subscribe({
+      next: (res) => this.applications = Array.isArray(res) ? res : (res?.data || []),
+      error: (err) => console.error('Failed to load apps:', err)
+    });
   }
 
   loadPolicies() {
-    this.api.getPolicies().subscribe(res => this.policies = res.data?.policies || res.data || []);
+    this.api.getPolicies().subscribe({
+      next: (res) => this.policies = Array.isArray(res) ? res : (res?.data || []),
+      error: (err) => console.error('Failed to load policies:', err)
+    });
   }
 
   createPolicy() {
-    this.api.createPolicy(this.newPolicy).subscribe(() => {
-      this.showPolicyModal = false;
-      this.loadPolicies();
-      this.showNotification('Policy rule created!');
+    this.api.createPolicy(this.newPolicy).subscribe({
+      next: () => {
+        this.showPolicyModal = false;
+        this.loadPolicies();
+        this.showNotification('Policy rule created!');
+      },
+      error: (err) => alert(err.error?.error?.message || 'Failed to create policy rule')
     });
   }
 
   deletePolicy(policyId: string) {
-    this.api.deletePolicy(policyId).subscribe(() => {
-      this.loadPolicies();
-      this.showNotification('Policy rule revoked!');
-    });
-  }
-
-  loadSessions() {
-    this.api.getSessions().subscribe(res => this.sessions = res.data?.sessions || res.data || []);
-  }
-
-  revokeSession(sessionId: string) {
-    this.api.revokeSession(sessionId).subscribe(() => {
-      this.loadSessions();
-      this.showNotification('Session revoked successfully!');
+    this.api.deletePolicy(policyId).subscribe({
+      next: () => {
+        this.loadPolicies();
+        this.showNotification('Policy rule revoked!');
+      },
+      error: (err) => alert(err.error?.error?.message || 'Failed to delete policy rule')
     });
   }
 
   loadAuditLogs() {
-    this.api.getAuditLogs().subscribe(res => this.auditLogs = res.data?.logs || res.data || []);
+    this.api.getAuditLogs().subscribe({
+      next: (res) => this.auditLogs = Array.isArray(res) ? res : (res?.data || []),
+      error: (err) => console.error('Failed to load audit logs:', err)
+    });
   }
 
   loadEvents() {
-    this.api.getEvents().subscribe(res => this.events = res.data?.events || res.data || []);
+    this.api.getEvents().subscribe({
+      next: (res) => this.events = Array.isArray(res) ? res : (res?.data || []),
+      error: (err) => console.error('Failed to load events:', err)
+    });
   }
 
   onLogout() {

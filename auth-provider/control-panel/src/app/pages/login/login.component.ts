@@ -59,13 +59,6 @@ import { ApiService } from '../../services/api.service';
           </button>
         </form>
 
-        <div class="footer">
-          <p>Demo Accounts:</p>
-          <div class="credentials">
-            <code>admin&#64;scaean-gate.com / password123</code>
-            <code>testuser&#64;scaean-gate.com / password123</code>
-          </div>
-        </div>
       </div>
     </div>
   `,
@@ -179,29 +172,6 @@ import { ApiService } from '../../services/api.service';
       cursor: not-allowed;
     }
 
-    .footer {
-      margin-top: 28px;
-      padding-top: 20px;
-      border-top: 1px solid #e2e8f0;
-      font-size: 0.8rem;
-      color: #64748b;
-      text-align: center;
-    }
-
-    .credentials {
-      margin-top: 8px;
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    code {
-      background: #f1f5f9;
-      padding: 3px 6px;
-      border-radius: 4px;
-      color: #334155;
-      font-size: 0.75rem;
-    }
   `]
 })
 export class LoginComponent {
@@ -209,8 +179,8 @@ export class LoginComponent {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
-  email = 'admin@scaean-gate.com';
-  password = 'password123';
+  email = '';
+  password = '';
   loading = false;
   errorMessage = '';
 

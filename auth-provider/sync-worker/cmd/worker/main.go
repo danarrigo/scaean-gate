@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/danarrigo/scaean-gate/auth-provider/sync-worker/config"
 	"github.com/danarrigo/scaean-gate/auth-provider/sync-worker/internal/consumer"
@@ -34,11 +35,19 @@ func main() {
 		kgo.SeedBrokers(brokerList...),
 		kgo.ConsumeTopics(cfg.KafkaTopic),
 		kgo.ConsumerGroup(cfg.KafkaGroupID),
+		kgo.DisableAutoCommit(),
 	)
 	if err != nil {
 		log.Fatalf("failed to initialize kafka client: %v", err)
 	}
 	defer kafkaClient.Close()
+
+	pingCtx, cancelPing := context.WithTimeout(context.Background(), 10*time.Second)
+	if err := kafkaClient.Ping(pingCtx); err != nil {
+		cancelPing()
+		log.Fatalf("failed to connect to kafka: %v", err)
+	}
+	cancelPing()
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -55,6 +64,7 @@ func main() {
 	kafkaCons := consumer.KafkaConsumer{
 		Client:     kafkaClient,
 		Dispatcher: disp,
+		DLQTopic:   cfg.KafkaDLQTopic,
 	}
 
 	log.Printf("sync worker started, listening on topic: %s", cfg.KafkaTopic)

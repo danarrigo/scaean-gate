@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"fmt"
 	"net/http"
 	"strings"
@@ -34,8 +35,8 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	}
 
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("oauth_verifier", verifier, 300, "/", "", false, true)
-	c.SetCookie("oauth_state", state, 300, "/", "", false, true)
+	c.SetCookie("oauth_verifier", verifier, 300, "/", "", h.Cfg.CookieSecure, true)
+	c.SetCookie("oauth_state", state, 300, "/", "", h.Cfg.CookieSecure, true)
 
 	c.Redirect(http.StatusFound, authURL)
 }
@@ -61,8 +62,8 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("oauth_verifier", "", -1, "/", "", false, true)
-	c.SetCookie("oauth_state", "", -1, "/", "", false, true)
+	c.SetCookie("oauth_verifier", "", -1, "/", "", h.Cfg.CookieSecure, true)
+	c.SetCookie("oauth_state", "", -1, "/", "", h.Cfg.CookieSecure, true)
 
 	rawLocalToken, err := h.AuthSvc.HandleCallback(c.Request.Context(), code, verifier)
 	if err != nil {
@@ -71,7 +72,7 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	}
 
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("app_a_session", rawLocalToken, int(24*time.Hour.Seconds()), "/", "", false, true)
+	c.SetCookie("app_a_session", rawLocalToken, int(24*time.Hour.Seconds()), "/", "", h.Cfg.CookieSecure, true)
 
 	c.Redirect(http.StatusFound, fmt.Sprintf("%s/dashboard", h.Cfg.FrontendURL))
 }
@@ -106,7 +107,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("app_a_session", "", -1, "/", "", false, true)
+	c.SetCookie("app_a_session", "", -1, "/", "", h.Cfg.CookieSecure, true)
 	response.JSON(c, http.StatusOK, gin.H{"message": "Logged out successfully"})
 }
 
@@ -118,7 +119,7 @@ func (h *AuthHandler) InternalLogout(c *gin.Context) {
 	}
 
 	token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
-	if token != h.Cfg.InternalAPISecret {
+	if subtle.ConstantTimeCompare([]byte(token), []byte(h.Cfg.InternalAPISecret)) != 1 {
 		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "Invalid internal API secret")
 		return
 	}

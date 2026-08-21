@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/danarrigo/scaean-gate/auth-provider/server/config"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/dto"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/pkg/response"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/services"
@@ -13,6 +14,7 @@ import (
 
 type AuthHandler struct {
 	AuthSvc services.AuthService
+	Cfg     *config.Config
 }
 
 func (h *AuthHandler) LoginHandler(c *gin.Context) {
@@ -29,7 +31,7 @@ func (h *AuthHandler) LoginHandler(c *gin.Context) {
 	}
 
 	c.SetSameSite(http.SameSiteLaxMode)
-	c.SetCookie("sso_session", result.RawToken, int(24*time.Hour.Seconds()), "/", "", false, true)
+	c.SetCookie("sso_session", result.RawToken, int(24*time.Hour.Seconds()), "/", "", h.Cfg.CookieSecure, true)
 
 	response.JSON(c, http.StatusOK, dto.LoginResponse{
 		Message: "Login Successful",
@@ -52,7 +54,7 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("sso_session", "", -1, "/", "", false, true)
+	c.SetCookie("sso_session", "", -1, "/", "", h.Cfg.CookieSecure, true)
 	response.JSON(c, http.StatusOK, gin.H{"message": "logout successful"})
 }
 
@@ -74,7 +76,7 @@ func (h *AuthHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie("sso_session", "", -1, "/", "", false, true)
+	c.SetCookie("sso_session", "", -1, "/", "", h.Cfg.CookieSecure, true)
 	response.JSON(c, http.StatusOK, gin.H{"message": "Password changed successfully"})
 }
 

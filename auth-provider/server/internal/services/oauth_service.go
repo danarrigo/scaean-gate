@@ -1,6 +1,8 @@
 package services
 
 import (
+	"crypto/subtle"
+	"errors"
 	"net/http"
 	"net/url"
 	"time"
@@ -100,6 +102,13 @@ func (s *OauthService) ExchangeToken(req dto.TokenRequest) (*dto.TokenResponse, 
 		return nil, response.NewAppError(http.StatusBadRequest, "INVALID_GRANT", "Invalid client")
 	}
 
+	if app.ClientSecretHash != "" {
+		providedHash := crypto.HashSHA256(req.ClientSecret)
+		if req.ClientSecret == "" || subtle.ConstantTimeCompare([]byte(app.ClientSecretHash), []byte(providedHash)) != 1 {
+			return nil, response.NewAppError(http.StatusUnauthorized, "INVALID_CLIENT", "Invalid client credentials")
+		}
+	}
+
 	if authCode.RedirectURI != req.RedirectURI {
 		return nil, response.NewAppError(http.StatusBadRequest, "INVALID_GRANT", "Redirect URI mismatch")
 	}
@@ -111,10 +120,6 @@ func (s *OauthService) ExchangeToken(req dto.TokenRequest) (*dto.TokenResponse, 
 	session, err := s.SessionRepo.GetSSOSessionByID(authCode.SSOSessionID)
 	if err != nil || session.Status != "active" || session.ExpiresAt.Before(time.Now()) {
 		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "SSO session is no longer active")
-	}
-
-	if err := s.OAuthRepo.MarkAuthCodeUsed(authCode.ID); err != nil {
-		return nil, err
 	}
 
 	rawToken, err := crypto.GenerateRandomString()
@@ -132,14 +137,18 @@ func (s *OauthService) ExchangeToken(req dto.TokenRequest) (*dto.TokenResponse, 
 		ExpiresAt:     time.Now().Add(1 * time.Hour),
 	}
 
-	if err := s.OAuthRepo.CreateAccessToken(&accessToken); err != nil {
+	if err := s.OAuthRepo.ConsumeAuthorizationCode(authCode.ID, &accessToken); err != nil {
+		if errors.Is(err, repository.ErrAuthorizationCodeConsumed) {
+			return nil, response.NewAppError(http.StatusBadRequest, "INVALID_GRANT", "Invalid, expired, or already used authorization code")
+		}
 		return nil, err
 	}
 
 	return &dto.TokenResponse{
-		AccessToken: rawToken,
-		TokenType:   "Bearer",
-		ExpiresIn:   3600,
+		AccessToken:      rawToken,
+		TokenType:        "Bearer",
+		ExpiresIn:        3600,
+		CentralSessionID: authCode.SSOSessionID,
 	}, nil
 }
 

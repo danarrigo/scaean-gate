@@ -36,7 +36,7 @@ export class ApiService {
   }
 
   updateUserStatus(id: string, status: string): Observable<any> {
-    return this.http.put(`${this.baseUrl}/admin/users/${id}/status`, { status }, this.opts);
+    return this.http.patch(`${this.baseUrl}/admin/users/${id}/status`, { status }, this.opts);
   }
 
   getGroups(): Observable<any> {
@@ -47,24 +47,24 @@ export class ApiService {
     return this.http.post(`${this.baseUrl}/admin/groups`, body, this.opts);
   }
 
-  getGroupMembers(groupId: string): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/groups/${groupId}/members`, this.opts);
+  getGroup(groupId: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/admin/groups/${groupId}`, this.opts);
   }
 
   addGroupMember(groupId: string, userId: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/groups/${groupId}/members`, { userId }, this.opts);
+    return this.http.post(`${this.baseUrl}/admin/groups/${groupId}/users`, { user_id: userId }, this.opts);
   }
 
   removeGroupMember(groupId: string, userId: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/admin/groups/${groupId}/members?userId=${userId}`, this.opts);
+    return this.http.delete(`${this.baseUrl}/admin/groups/${groupId}/users/${userId}`, this.opts);
   }
 
   getApps(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/applications`, this.opts);
+    return this.http.get(`${this.baseUrl}/admin/apps`, this.opts);
   }
 
   createApp(body: any): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/applications`, body, this.opts);
+    return this.http.post(`${this.baseUrl}/admin/apps`, body, this.opts);
   }
 
   getPolicies(): Observable<any> {
@@ -72,7 +72,11 @@ export class ApiService {
   }
 
   createPolicy(body: { groupId: string; applicationId: string; effect: string }): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/policies`, body, this.opts);
+    return this.http.post(`${this.baseUrl}/admin/policies`, {
+      group_id: body.groupId,
+      application_id: body.applicationId,
+      effect: body.effect
+    }, this.opts);
   }
 
   deletePolicy(policyId: string): Observable<any> {
@@ -85,13 +89,5 @@ export class ApiService {
 
   getEvents(): Observable<any> {
     return this.http.get(`${this.baseUrl}/admin/events`, this.opts);
-  }
-
-  getSessions(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/sessions`, this.opts);
-  }
-
-  revokeSession(sessionId: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/sessions/${sessionId}/revoke`, {}, this.opts);
   }
 }

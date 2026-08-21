@@ -22,10 +22,10 @@ type UserInfoResponse struct {
 }
 
 type BackChannelLogoutPayload struct {
-	EventID          uuid.UUID  `json:"eventId"`
-	EventType        string     `json:"eventType"`
-	UserID           uuid.UUID  `json:"userId"`
-	CentralSessionID *uuid.UUID `json:"centralSessionId,omitempty"`
+	EventID          uuid.UUID  `json:"event_id"`
+	EventType        string     `json:"event_type"`
+	UserID           uuid.UUID  `json:"user_id"`
+	CentralSessionID *uuid.UUID `json:"central_session_id,omitempty"`
 	Reason           string     `json:"reason"`
 }
 

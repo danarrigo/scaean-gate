@@ -2,15 +2,15 @@ package database
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
+	appcrypto "github.com/danarrigo/scaean-gate/auth-provider/server/internal/pkg/crypto"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
-func Seed(db *gorm.DB) error {
+func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALogoutURL, appBLogoutURL string) error {
 	adminGroup := models.Group{
 		Name:        "Admin",
 		Description: "Group for Administrators",
@@ -27,11 +27,6 @@ func Seed(db *gorm.DB) error {
 	err = db.FirstOrCreate(&userGroup, models.Group{Name: userGroup.Name}).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
-	}
-
-	seedPassword := os.Getenv("SEED_USER_PASSWORD")
-	if seedPassword == "" {
-		return fmt.Errorf("missing required environment variable: SEED_USER_PASSWORD")
 	}
 
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(seedPassword), bcrypt.DefaultCost)
@@ -90,57 +85,52 @@ func Seed(db *gorm.DB) error {
 	}
 
 	appA := models.Application{
-		Name:                  "App A",
+		Name:                  "Apex",
 		ClientID:              "app-a-client-id",
-		ClientSecretHash:      string(hashedPassword),
+		ClientSecretHash:      appcrypto.HashSHA256(appAClientSecret),
 		Status:                "active",
 		LaunchURL:             "http://localhost:4201",
-		LogoutNotificationURL: "http://localhost:8081/internal/logout",
+		LogoutNotificationURL: appALogoutURL,
 	}
 
 	appB := models.Application{
-		Name:                  "App B",
+		Name:                  "Bolt",
 		ClientID:              "app-b-client-id",
-		ClientSecretHash:      string(hashedPassword),
+		ClientSecretHash:      appcrypto.HashSHA256(appBClientSecret),
 		Status:                "active",
 		LaunchURL:             "http://localhost:4202",
-		LogoutNotificationURL: "http://localhost:8082/internal/logout",
+		LogoutNotificationURL: appBLogoutURL,
 	}
 
-	err = db.FirstOrCreate(&appA, models.Application{ClientID: appA.ClientID}).Error
+	err = db.Where(models.Application{ClientID: appA.ClientID}).
+		Assign(models.Application{ClientSecretHash: appA.ClientSecretHash, LogoutNotificationURL: appA.LogoutNotificationURL}).
+		FirstOrCreate(&appA).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
 
-	err = db.FirstOrCreate(&appB, models.Application{ClientID: appB.ClientID}).Error
+	err = db.Where(models.Application{ClientID: appB.ClientID}).
+		Assign(models.Application{ClientSecretHash: appB.ClientSecretHash, LogoutNotificationURL: appB.LogoutNotificationURL}).
+		FirstOrCreate(&appB).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
 
-	appARedirect := models.ApplicationRedirectURI{
-		ApplicationID: appA.ID,
-		RedirectURI:   "http://localhost:4201/callback",
+	uris := []models.ApplicationRedirectURI{
+		{ApplicationID: appA.ID, RedirectURI: "http://localhost:8081/auth/callback"},
+		{ApplicationID: appA.ID, RedirectURI: "http://localhost:4201/callback"},
+		{ApplicationID: appB.ID, RedirectURI: "http://localhost:8082/auth/callback"},
+		{ApplicationID: appB.ID, RedirectURI: "http://localhost:4202/callback"},
 	}
 
-	appBRedirect := models.ApplicationRedirectURI{
-		ApplicationID: appB.ID,
-		RedirectURI:   "http://localhost:4202/callback",
-	}
-
-	err = db.FirstOrCreate(&appARedirect, models.ApplicationRedirectURI{
-		ApplicationID: appARedirect.ApplicationID,
-		RedirectURI:   appARedirect.RedirectURI,
-	}).Error
-	if err != nil {
-		return fmt.Errorf("error: %w", err)
-	}
-
-	err = db.FirstOrCreate(&appBRedirect, models.ApplicationRedirectURI{
-		ApplicationID: appBRedirect.ApplicationID,
-		RedirectURI:   appBRedirect.RedirectURI,
-	}).Error
-	if err != nil {
-		return fmt.Errorf("error: %w", err)
+	for _, u := range uris {
+		err = db.FirstOrCreate(&u, models.ApplicationRedirectURI{
+			ApplicationID: u.ApplicationID,
+			RedirectURI:   u.RedirectURI,
+		}).Error
+		if err != nil {
+			return fmt.Errorf("error: %w", err)
+		}
 	}
 
 	appAPolicy := models.ApplicationGroupPolicy{

@@ -21,7 +21,6 @@ type AdminService struct {
 	AppRepo     repository.AppRepository
 	PolicyRepo  repository.PolicyRepository
 	AuditRepo   repository.AuditRepository
-	EventSvc    *EventService
 }
 
 func (s *AdminService) AdminAuth(cookie string) (*models.User, error) {
@@ -176,10 +175,6 @@ func (s *AdminService) UpdateUserStatus(userID uuid.UUID, status string) error {
 
 	if err := s.UserRepo.UpdateUserStatusTx(userID, status, event); err != nil {
 		return err
-	}
-
-	if event != nil {
-		go s.EventSvc.PublishEvent(*event)
 	}
 
 	return nil
@@ -477,21 +472,7 @@ func (s *AdminService) DeletePolicy(id uuid.UUID) error {
 		return response.NewAppError(http.StatusNotFound, "NOT_FOUND", "Policy not found")
 	}
 
-	payload := fmt.Sprintf(`{"application_id":"%s","group_id":"%s"}`, policy.ApplicationID, policy.GroupID)
-	event := models.Event{
-		EventType:     "AccessPolicyChanged",
-		ApplicationID: &policy.ApplicationID,
-		Payload:       payload,
-		Status:        "pending",
-	}
-
-	if err := s.PolicyRepo.DeletePolicyTx(id, &event); err != nil {
-		return err
-	}
-
-	go s.EventSvc.PublishEvent(event)
-
-	return nil
+	return s.PolicyRepo.DeletePolicyWithEvents(id, policy.ApplicationID, policy.GroupID)
 }
 
 func (s *AdminService) ListAuditLogs() ([]dto.AuditLogResponse, error) {

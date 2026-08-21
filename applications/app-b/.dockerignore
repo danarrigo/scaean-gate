@@ -1,0 +1,6 @@
+.env
+.env.*
+Dockerfile
+.git
+client
+*.log

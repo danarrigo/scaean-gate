@@ -3,45 +3,55 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
 type Config struct {
-	Port              string
-	AppName           string
-	ClientID          string
-	ClientSecret      string
-	AuthProviderURL   string
-	RedirectURI       string
-	FrontendURL       string
-	DBHost            string
-	DBPort            string
-	DBUser            string
-	DBPassword        string
-	DBName            string
-	DBSSLMode         string
-	InternalAPISecret string
+	Port                    string
+	AppName                 string
+	ClientID                string
+	ClientSecret            string
+	AuthProviderURL         string
+	AuthProviderInternalURL string
+	RedirectURI             string
+	FrontendURL             string
+	DBHost                  string
+	DBPort                  string
+	DBUser                  string
+	DBPassword              string
+	DBName                  string
+	DBSSLMode               string
+	InternalAPISecret       string
+	CookieSecure            bool
 }
 
 func LoadConfig() (*Config, error) {
 	_ = godotenv.Load()
 
+	cookieSecure, err := strconv.ParseBool(getEnvWithDefault("COOKIE_SECURE", "false"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid COOKIE_SECURE: %w", err)
+	}
+
 	cfg := &Config{
-		Port:              getEnvWithDefault("PORT", "8082"),
-		AppName:           getEnvWithDefault("APP_NAME", "Bolt"),
-		ClientID:          getEnvWithDefault("CLIENT_ID", "app-b-client-id"),
-		ClientSecret:      os.Getenv("CLIENT_SECRET"),
-		AuthProviderURL:   getEnvWithDefault("AUTH_PROVIDER_URL", "http://localhost:8080"),
-		RedirectURI:       getEnvWithDefault("REDIRECT_URI", "http://localhost:8082/auth/callback"),
-		FrontendURL:       getEnvWithDefault("FRONTEND_URL", "http://localhost:4202"),
-		DBHost:            os.Getenv("DB_HOST"),
-		DBPort:            getEnvWithDefault("DB_PORT", "5432"),
-		DBUser:            os.Getenv("DB_USER"),
-		DBPassword:        os.Getenv("DB_PASSWORD"),
-		DBName:            os.Getenv("DB_NAME"),
-		DBSSLMode:         getEnvWithDefault("DB_SSLMODE", "disable"),
-		InternalAPISecret: getEnvWithDefault("INTERNAL_API_SECRET", "super-secret-internal-key"),
+		Port:                    getEnvWithDefault("PORT", "8082"),
+		AppName:                 getEnvWithDefault("APP_NAME", "Bolt"),
+		ClientID:                os.Getenv("CLIENT_ID"),
+		ClientSecret:            os.Getenv("CLIENT_SECRET"),
+		AuthProviderURL:         getEnvWithDefault("AUTH_PROVIDER_URL", "http://localhost:8080"),
+		AuthProviderInternalURL: getEnvWithDefault("AUTH_PROVIDER_INTERNAL_URL", "http://localhost:8080"),
+		RedirectURI:             getEnvWithDefault("REDIRECT_URI", "http://localhost:8082/auth/callback"),
+		FrontendURL:             getEnvWithDefault("FRONTEND_URL", "http://localhost:4202"),
+		DBHost:                  os.Getenv("DB_HOST"),
+		DBPort:                  getEnvWithDefault("DB_PORT", "5432"),
+		DBUser:                  os.Getenv("DB_USER"),
+		DBPassword:              os.Getenv("DB_PASSWORD"),
+		DBName:                  os.Getenv("DB_NAME"),
+		DBSSLMode:               getEnvWithDefault("DB_SSLMODE", "disable"),
+		InternalAPISecret:       os.Getenv("INTERNAL_API_SECRET"),
+		CookieSecure:            cookieSecure,
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -52,6 +62,15 @@ func LoadConfig() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	if c.ClientID == "" {
+		return fmt.Errorf("missing required environment variable: CLIENT_ID")
+	}
+	if c.ClientSecret == "" {
+		return fmt.Errorf("missing required environment variable: CLIENT_SECRET")
+	}
+	if c.InternalAPISecret == "" {
+		return fmt.Errorf("missing required environment variable: INTERNAL_API_SECRET")
+	}
 	if c.DBHost == "" {
 		return fmt.Errorf("missing required environment variable: DB_HOST")
 	}

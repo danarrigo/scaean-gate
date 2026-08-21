@@ -1,5 +1,7 @@
 package dto
 
+import "github.com/google/uuid"
+
 type AuthorizeRequest struct {
 	ClientID            string `form:"client_id" binding:"required"`
 	RedirectURI         string `form:"redirect_uri" binding:"required,url"`
@@ -19,9 +21,10 @@ type TokenRequest struct {
 }
 
 type TokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
+	AccessToken      string    `json:"access_token"`
+	TokenType        string    `json:"token_type"`
+	ExpiresIn        int       `json:"expires_in"`
+	CentralSessionID uuid.UUID `json:"central_session_id"`
 }
 
 type UserInfoResponse struct {

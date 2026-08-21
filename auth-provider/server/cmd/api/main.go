@@ -1,9 +1,10 @@
 package main
 
 import (
+	"context"
 	"log"
-
 	"strings"
+	"time"
 
 	"github.com/danarrigo/scaean-gate/auth-provider/server/config"
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/database"
@@ -32,7 +33,7 @@ func main() {
 		log.Fatalf("failed to run migrations: %v", err)
 	}
 
-	if err := database.Seed(db); err != nil {
+	if err := database.Seed(db, cfg.SeedUserPassword, cfg.SeedAppAClientSecret, cfg.SeedAppBClientSecret, cfg.AppALogoutURL, cfg.AppBLogoutURL); err != nil {
 		log.Fatalf("failed to seed database: %v", err)
 	}
 
@@ -43,32 +44,33 @@ func main() {
 	policyRepo := repository.PolicyRepository{DB: db}
 	oauthRepo := repository.OAuthRepository{DB: db}
 	auditRepo := repository.AuditRepository{DB: db}
+	outboxRepo := repository.OutboxRepository{DB: db}
 
 	brokerList := strings.Split(cfg.KafkaBrokers, ",")
-	kafkaClient, err := kgo.NewClient(
-		kgo.SeedBrokers(brokerList...),
-	)
+	kafkaClient, err := kgo.NewClient(kgo.SeedBrokers(brokerList...))
 	if err != nil {
-		log.Printf("failed to initialize kafka client: %v", err)
+		log.Fatalf("failed to initialize kafka client: %v", err)
 	}
-	defer func() {
-		if kafkaClient != nil {
-			kafkaClient.Close()
-		}
-	}()
+	defer kafkaClient.Close()
+
+	kafkaCtx, cancelKafkaPing := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelKafkaPing()
+	if err := kafkaClient.Ping(kafkaCtx); err != nil {
+		log.Fatalf("failed to connect to kafka: %v", err)
+	}
 
 	eventSvc := &services.EventService{
-		Client:    kafkaClient,
-		Topic:     "sso-session-events",
-		AuditRepo: auditRepo,
+		Client:     kafkaClient,
+		Topic:      cfg.KafkaTopic,
+		OutboxRepo: outboxRepo,
 	}
+	go eventSvc.RunOutboxPublisher(context.Background(), time.Second)
 
 	auditSvc := services.AuditService{Repo: auditRepo}
 	authSvc := services.AuthService{
 		UserRepo:    userRepo,
 		SessionRepo: sessionRepo,
 		AuditSvc:    auditSvc,
-		EventSvc:    eventSvc,
 	}
 	oauthSvc := services.OauthService{
 		SessionRepo: sessionRepo,
@@ -84,14 +86,15 @@ func main() {
 		AppRepo:     appRepo,
 		PolicyRepo:  policyRepo,
 		AuditRepo:   auditRepo,
-		EventSvc:    eventSvc,
 	}
 
 	authHandler := handler.AuthHandler{
 		AuthSvc: authSvc,
+		Cfg:     cfg,
 	}
 	oauthHandler := handler.OauthHandler{
 		OAuthSvc: oauthSvc,
+		Cfg:      cfg,
 	}
 	userHandler := handler.UserHandler{
 		AdminSvc: adminSvc,
@@ -115,9 +118,10 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Recovery())
 	r.Use(middleware.RequestIDMiddleware)
-	r.Use(middleware.CORSMiddleware)
+	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
 	r.Use(middleware.LoggerMiddleware)
 
+	r.GET("/health", func(c *gin.Context) { c.Status(200) })
 	r.POST("/login", authHandler.LoginHandler)
 	r.POST("/logout", authHandler.Logout)
 	r.POST("/change-password", authHandler.ChangePassword)

@@ -47,11 +47,12 @@ func main() {
 		c.Header("X-Request-ID", reqID)
 
 		origin := c.GetHeader("Origin")
-		if origin == cfg.FrontendURL || origin == "http://localhost:4201" {
+		if origin == cfg.FrontendURL {
 			c.Header("Access-Control-Allow-Origin", origin)
 			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Cache-Control, X-Requested-With, X-Request-ID")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-CSRF-Token, X-Request-ID")
+			c.Header("Vary", "Origin")
 		}
 
 		if c.Request.Method == http.MethodOptions {
@@ -62,15 +63,16 @@ func main() {
 		c.Next()
 	})
 
+	r.GET("/health", func(c *gin.Context) { c.Status(http.StatusOK) })
 	r.GET("/auth/login", authHandler.Login)
 	r.GET("/auth/callback", authHandler.Callback)
 	r.POST("/internal/logout", authHandler.InternalLogout)
-	r.GET("/events", authHandler.GetEvents)
 
 	protected := r.Group("")
 	protected.Use(middleware.AuthMiddleware(repo))
 	{
 		protected.GET("/me", authHandler.Me)
+		protected.GET("/events", authHandler.GetEvents)
 		protected.POST("/logout", authHandler.Logout)
 	}
 

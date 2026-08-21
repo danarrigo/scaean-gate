@@ -11,6 +11,7 @@ type Config struct {
 	KafkaBrokers      string
 	KafkaTopic        string
 	KafkaGroupID      string
+	KafkaDLQTopic     string
 	DBHost            string
 	DBPort            string
 	DBUser            string
@@ -27,13 +28,14 @@ func LoadConfig() (*Config, error) {
 		KafkaBrokers:      getEnvWithDefault("KAFKA_BROKERS", "localhost:9092"),
 		KafkaTopic:        getEnvWithDefault("KAFKA_TOPIC", "sso-session-events"),
 		KafkaGroupID:      getEnvWithDefault("KAFKA_GROUP_ID", "sync-worker-group"),
+		KafkaDLQTopic:     getEnvWithDefault("KAFKA_DLQ_TOPIC", "sso-session-events-dlq"),
 		DBHost:            os.Getenv("DB_HOST"),
 		DBPort:            getEnvWithDefault("DB_PORT", "5432"),
 		DBUser:            os.Getenv("DB_USER"),
 		DBPassword:        os.Getenv("DB_PASSWORD"),
 		DBName:            os.Getenv("DB_NAME"),
 		DBSSLMode:         getEnvWithDefault("DB_SSLMODE", "disable"),
-		InternalAPISecret: getEnvWithDefault("INTERNAL_API_SECRET", "super-secret-internal-key"),
+		InternalAPISecret: os.Getenv("INTERNAL_API_SECRET"),
 	}
 
 	if err := cfg.Validate(); err != nil {
@@ -44,6 +46,9 @@ func LoadConfig() (*Config, error) {
 }
 
 func (c *Config) Validate() error {
+	if c.InternalAPISecret == "" {
+		return fmt.Errorf("missing required environment variable: INTERNAL_API_SECRET")
+	}
 	if c.DBHost == "" {
 		return fmt.Errorf("missing required environment variable: DB_HOST")
 	}
