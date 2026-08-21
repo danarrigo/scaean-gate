@@ -1,0 +1,81 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+
+	"github.com/danarrigo/scaean-gate/applications/app-b/config"
+	"github.com/danarrigo/scaean-gate/applications/app-b/internal/handler"
+	"github.com/danarrigo/scaean-gate/applications/app-b/internal/middleware"
+	"github.com/danarrigo/scaean-gate/applications/app-b/internal/models"
+	"github.com/danarrigo/scaean-gate/applications/app-b/internal/repository"
+	"github.com/danarrigo/scaean-gate/applications/app-b/internal/services"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+func main() {
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("failed to load configuration: %v", err)
+	}
+
+	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{})
+	if err != nil {
+		log.Fatalf("failed to connect database: %v", err)
+	}
+
+	if err := db.AutoMigrate(&models.LocalSession{}, &models.ProfileCache{}, &models.ProcessedEvent{}); err != nil {
+		log.Fatalf("failed to auto-migrate database: %v", err)
+	}
+
+	repo := &repository.SessionRepository{DB: db}
+	authSvc := services.NewAuthService(repo, cfg)
+	authHandler := handler.NewAuthHandler(authSvc, cfg)
+
+	r := gin.Default()
+
+	r.Use(func(c *gin.Context) {
+		reqID := c.GetHeader("X-Request-ID")
+		if reqID == "" {
+			reqID = uuid.New().String()
+		}
+		c.Set("RequestID", reqID)
+		c.Header("X-Request-ID", reqID)
+
+		origin := c.GetHeader("Origin")
+		if origin == cfg.FrontendURL || origin == "http://localhost:4202" {
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Credentials", "true")
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, Accept, Cache-Control, X-Requested-With, X-Request-ID")
+		}
+
+		if c.Request.Method == http.MethodOptions {
+			c.AbortWithStatus(http.StatusNoContent)
+			return
+		}
+
+		c.Next()
+	})
+
+	r.GET("/auth/login", authHandler.Login)
+	r.GET("/auth/callback", authHandler.Callback)
+	r.POST("/internal/logout", authHandler.InternalLogout)
+	r.GET("/events", authHandler.GetEvents)
+
+	protected := r.Group("")
+	protected.Use(middleware.AuthMiddleware(repo))
+	{
+		protected.GET("/me", authHandler.Me)
+		protected.POST("/logout", authHandler.Logout)
+	}
+
+	log.Printf("%s backend starting on port %s...", cfg.AppName, cfg.Port)
+	if err := r.Run(fmt.Sprintf(":%s", cfg.Port)); err != nil {
+		log.Fatalf("failed to run server: %v", err)
+	}
+}
