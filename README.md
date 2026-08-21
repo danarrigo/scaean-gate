@@ -144,12 +144,12 @@ Perubahan password dan akses memakai jalur pencabutan yang sama.
 
 - **Opaque token, bukan JWT:** pencabutan dapat berlaku langsung dan token tidak membawa claim lama. Konsekuensinya, validasi harus melalui Auth Provider.
 - **Kafka, bukan RabbitMQ:** Kafka menyediakan event log yang tahan lama, replay, consumer group, dan urutan per partisi. Fitur ini cocok untuk pencabutan sesi yang perlu dilacak dan diproses ulang.
-- **Shared secret, bukan cookie pengguna:** `/internal/logout` dipanggil oleh Sync Worker, bukan browser. Bearer secret sederhana dan cukup untuk jaringan internal Compose.
+- **Shared secret untuk service-to-service:** Sync Worker mengirim `INTERNAL_API_SECRET` sebagai Bearer token saat memanggil `/internal/logout`. Cookie tidak digunakan karena pemanggilnya adalah service, bukan browser pengguna. Payload berisi user dan central session yang harus dicabut, sehingga beberapa sesi tetap dapat diproses saat browser offline. Untuk produksi multi-host, mekanisme ini sebaiknya ditingkatkan ke mTLS atau workload identity.
 - **Soft-delete, bukan hard-delete:** data administratif tetap tersedia untuk audit dan relasi historis. Sesi serta token menggunakan status `revoked` atau `expired`.
 - **Sesi lokal terpisah:** local logout tidak menghapus sesi SSO atau sesi aplikasi lain. Pencabutan pusat dikirim secara asinkron.
 - **Authorization Code + PKCE:** authorization code sekali pakai dan challenge `S256` mencegah code yang dicuri digunakan tanpa verifier.
 
-## Tech Stack dan Versi
+### Tech Stack dan Versi
 
 | Bagian | Teknologi | Versi |
 | --- | --- | --- |
