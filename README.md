@@ -17,29 +17,16 @@ App A bernama **Apex**, sedangkan App B bernama **Bolt**.
 
 - Docker Engine dengan Docker Compose
 - Memori kosong minimal 4 GB untuk PostgreSQL, Kafka, layanan Go, dan tiga frontend
-- Node.js/npm hanya diperlukan jika Playwright dijalankan di luar Docker
 
 ### Konfigurasi
 
-Buat berkas environment lokal:
+Salin konfigurasi development yang telah disediakan:
 
 ```bash
 cp .env.example .env
 ```
 
-Isi seluruh nilai kosong di `.env` dengan secret yang kuat dan unik:
-
-```dotenv
-DB_USER=sso_user
-DB_PASSWORD=<password-database-yang-kuat>
-SEED_USER_PASSWORD=<password-awal-untuk-kedua-pengguna-seed>
-APP_A_CLIENT_SECRET=<secret-app-a-yang-kuat>
-APP_B_CLIENT_SECRET=<secret-app-b-yang-kuat>
-INTERNAL_API_SECRET=<secret-worker-ke-aplikasi-yang-kuat>
-COOKIE_SECURE=false
-```
-
-`.env` diabaikan oleh Git dan tidak boleh di-commit. `COOKIE_SECURE=false` diperlukan untuk HTTP lokal. Ubah menjadi `true` apabila sistem dijalankan di balik HTTPS.
+Nilai pada `.env.example` dapat langsung digunakan untuk menjalankan sistem secara lokal. Ganti seluruh secret dan gunakan `COOKIE_SECURE=true` sebelum deployment produksi. `.env` diabaikan oleh Git dan tidak boleh di-commit.
 
 ### Menjalankan Sistem
 
@@ -57,13 +44,6 @@ docker compose ps
 ```
 
 ### Pembuatan Database, Migrasi, dan Seeder
-
-Tidak diperlukan perintah migrasi terpisah:
-
-1. Saat PostgreSQL pertama kali dijalankan, `scripts/init-databases.sh` membuat `sso_db`, `app_a_db`, dan `app_b_db`.
-2. Auth Provider menjalankan GORM `AutoMigrate` untuk tabel identitas pusat, OAuth, kebijakan akses, audit, event, dan delivery ketika startup.
-3. App A dan App B menjalankan `AutoMigrate` untuk tabel sesi lokal, cache profil, event yang telah diproses, dan aktivitas ketika startup.
-4. Auth Provider kemudian menjalankan seeder yang idempoten ketika startup.
 
 Seeder membuat data berikut:
 
@@ -103,28 +83,6 @@ docker compose down
 ```
 
 Gunakan `docker compose down -v` hanya jika volume database juga ingin dihapus.
-
-### Pengujian
-
-Jalankan pengujian backend:
-
-```bash
-(cd auth-provider/server && go test ./...)
-(cd auth-provider/sync-worker && go test ./...)
-(cd applications/app-a && go test ./...)
-(cd applications/app-b && go test ./...)
-```
-
-Jalankan dua alur kritis Playwright pada proyek Compose yang terisolasi:
-
-```bash
-cd e2e
-npm ci
-npm run install:browsers
-npm run test:docker
-```
-
-E2E runner akan menghentikan proyek Compose utama untuk sementara, membuat stack pengujian yang bersih dan terisolasi, menguji Authorization Code + PKCE beserta local logout dan SSO logout, menghapus stack serta volume pengujian, kemudian menjalankan kembali proyek utama apabila sebelumnya aktif.
 
 ## Arsitektur dan Alur Request
 
@@ -187,49 +145,48 @@ Perubahan password dan hilangnya otorisasi akibat perubahan grup, aplikasi, atau
 
 ### Opaque Token Dibandingkan JWT
 
-Access token berupa nilai opaque acak yang aman secara kriptografis. Hash dan status token disimpan secara terpusat. Resource application mengambil identitas melalui `/userinfo`, bukan mempercayai claim mandiri di dalam token.
-
-Konsekuensi pemilihan opaque token:
-
-- Pencabutan dan kedaluwarsa berlaku langsung di Auth Provider.
-- Perubahan grup atau akun tidak meninggalkan claim otorisasi lama di dalam token yang sudah ditandatangani.
-- Token tidak mengungkapkan data pengguna atau otorisasi kepada client.
-- Validasi memerlukan lookup ke Auth Provider, tidak seperti verifikasi JWT secara offline, sehingga ketersediaan dan latensi database perlu diperhatikan.
+- **Pilihan:** access token berupa nilai opaque acak; hash dan statusnya disimpan secara terpusat.
+- **Validasi:** relying application mengambil identitas melalui `/userinfo`.
+- **Kelebihan:** pencabutan berlaku langsung, token tidak membocorkan data, dan perubahan grup tidak meninggalkan claim lama.
+- **Konsekuensi:** validasi memerlukan lookup ke Auth Provider sehingga bergantung pada ketersediaan database.
 
 ### Apache Kafka sebagai Message Broker
 
-Kafka 7.5.0 membawa event `SessionRevoked`, `PasswordChanged`, dan `AccessPolicyChanged`. Kafka memisahkan transaksi identitas pusat dari ketersediaan relying application, mendukung pemrosesan berurutan dalam partisi yang dikonfigurasi, consumer group, retry, observabilitas delivery, serta dead-letter topic. Transactional database outbox mencegah perubahan identitas tersimpan tanpa catatan event yang tahan lama.
+- Membawa event `SessionRevoked`, `PasswordChanged`, dan `AccessPolicyChanged`.
+- Memisahkan transaksi Auth Provider dari ketersediaan Apex dan Bolt.
+- Mendukung consumer group, retry, delivery tracking, dan dead-letter topic.
+- Menggunakan transactional outbox agar perubahan data selalu memiliki event yang tahan lama.
 
 ### Autentikasi Service-to-Service
 
-Sync Worker memanggil `POST /internal/logout` menggunakan:
-
-```http
-Authorization: Bearer <INTERNAL_API_SECRET>
-```
-
-App A dan App B membandingkan nilai yang diterima dengan shared secret dari environment. Endpoint ini tidak menggunakan autentikasi cookie browser dan hanya ditujukan untuk jaringan internal Compose yang dipercaya. Pada deployment produksi multi-host, TLS/mTLS atau managed workload identity sebaiknya ditambahkan.
+- Sync Worker memanggil `POST /internal/logout` dengan `Authorization: Bearer <INTERNAL_API_SECRET>`.
+- Apex dan Bolt memvalidasi shared secret dari environment variable.
+- Endpoint hanya ditujukan untuk jaringan internal Compose dan tidak menggunakan cookie browser.
+- Deployment produksi multi-host sebaiknya menambahkan TLS/mTLS atau workload identity.
 
 ### Retensi Data dan Penghapusan
 
-Resource yang dikelola administrator menggunakan soft deletion (`deleted_at`). Query normal tidak menampilkan data terhapus, tetapi riwayat audit dan relasi historis tetap tersedia. Strategi ini diterapkan pada pengguna, grup, keanggotaan pengguna-grup, aplikasi, redirect URI, dan kebijakan akses.
-
-Sesi dan token dipertahankan dengan status siklus hidup seperti `revoked` atau `expired`. Audit log, outbox event, percobaan delivery, aktivitas lokal, cache profil, dan catatan event yang telah diproses merupakan data historis/operasional, bukan resource yang dihapus oleh administrator. Strategi ini mempertahankan bukti keamanan, status retry, dan idempotensi.
+- Pengguna, grup, keanggotaan, aplikasi, redirect URI, dan kebijakan menggunakan soft deletion (`deleted_at`).
+- Sesi dan token dipertahankan dengan status seperti `revoked` atau `expired`.
+- Audit log, event, delivery, cache profil, dan processed event dipertahankan sebagai riwayat operasional.
+- Strategi ini menjaga bukti keamanan, kemampuan retry, relasi historis, dan idempotensi.
 
 ### Batas Kepemilikan Sesi
 
-Auth Provider memiliki sesi SSO pusat. Apex dan Bolt masing-masing memiliki sesi lokal serta database yang terpisah. Local logout tidak mengubah state pusat, sedangkan pencabutan pusat dipropagasikan secara asinkron menuju state lokal.
+- Auth Provider memiliki sesi SSO pusat.
+- Apex dan Bolt memiliki sesi lokal dan database masing-masing.
+- Local logout hanya menghapus sesi aplikasi terkait.
+- Pencabutan sesi pusat dipropagasikan secara asinkron melalui Kafka.
 
 ### Mekanisme Keamanan
 
-- Authorization Code flow dengan PKCE `S256`
-- Authorization code berumur pendek dan sekali pakai
-- Pencocokan redirect URI secara persis
-- Password dan client secret yang di-hash
-- Opaque token dan identifier sesi yang di-hash sesuai kebutuhan
-- Cookie HTTP-only dan konfigurasi kewajiban secure cookie
-- Request ID, format error terstruktur, audit log, allow-list CORS, dan pemrosesan event idempoten
-- Secret hanya diberikan melalui environment variable
+- Authorization Code flow dengan PKCE `S256`.
+- Authorization code berumur pendek dan sekali pakai.
+- Redirect URI harus cocok secara persis.
+- Password, client secret, opaque token, dan identifier sesi disimpan dalam bentuk hash sesuai kebutuhan.
+- Cookie menggunakan HTTP-only dengan konfigurasi secure cookie.
+- Request ID, format error terstruktur, audit log, allow-list CORS, dan event idempoten.
+- Seluruh secret diberikan melalui environment variable.
 
 ## Tech Stack dan Versi
 
@@ -241,7 +198,6 @@ Auth Provider memiliki sesi SSO pusat. Apex dan Bolt masing-masing memiliki sesi
 | Message broker | Apache Kafka, ZooKeeper | 7.5.0 |
 | Web server | NGINX | 1.27 |
 | Container | Docker, Docker Compose | Compose Specification |
-| E2E testing | Playwright | 1.62.1 |
 
 ## Daftar Endpoint API
 
@@ -323,26 +279,26 @@ Kedua relying application mengimplementasikan path yang sama.
 
 ## Screenshots
 
-### Halaman Sign-in Apex
+### Apex Sign-in
 
-![Halaman sign-in Apex](docs/screenshots/01-apex-sign-in.png)
+![Apex sign-in](docs/screenshots/01-apex-sign-in.png)
 
-### Login Identitas Terpusat
+### Central Identity Login
 
-![Login terpusat](docs/screenshots/02-central-login.png)
+![Central identity login](docs/screenshots/02-central-login.png)
 
-### Sesi Lokal Apex Setelah OAuth 2.0 + PKCE
+### Apex Session After OAuth 2.0 + PKCE
 
-![Dashboard Apex](docs/screenshots/03-apex-dashboard.png)
+![Apex dashboard](docs/screenshots/03-apex-dashboard.png)
 
-### Bolt Menggunakan Sesi SSO Pusat yang Sudah Aktif
+### Bolt Using the Existing SSO Session
 
-![Dashboard SSO Bolt](docs/screenshots/04-bolt-sso-dashboard.png)
+![Bolt SSO dashboard](docs/screenshots/04-bolt-sso-dashboard.png)
 
-### Control Panel Administratif
+### Administrative Control Panel
 
-![Control panel admin](docs/screenshots/05-admin-control-panel.png)
+![Administrative control panel](docs/screenshots/05-admin-control-panel.png)
 
-### Sesi Relying Application yang Dicabut Secara Asinkron
+### Asynchronously Revoked Application Session
 
-![Sesi dicabut](docs/screenshots/06-revoked-session.png)
+![Revoked application session](docs/screenshots/06-revoked-session.png)
