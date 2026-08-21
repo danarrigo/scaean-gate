@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/danarrigo/scaean-gate/applications/app-b/config"
@@ -33,6 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to access database pool: %v", err)
 	}
+	defer sqlDB.Close()
 
 	if err := db.AutoMigrate(&models.LocalSession{}, &models.ProfileCache{}, &models.ProcessedEvent{}, &models.AuthActivity{}); err != nil {
 		log.Fatalf("failed to auto-migrate database: %v", err)
@@ -98,8 +102,30 @@ func main() {
 		protected.POST("/logout", authHandler.Logout)
 	}
 
+	server := &http.Server{
+		Addr:              fmt.Sprintf(":%s", cfg.Port),
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	serverErr := make(chan error, 1)
+	go func() { serverErr <- server.ListenAndServe() }()
+
 	log.Printf("%s backend starting on port %s...", cfg.AppName, cfg.Port)
-	if err := r.Run(fmt.Sprintf(":%s", cfg.Port)); err != nil {
-		log.Fatalf("failed to run server: %v", err)
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	select {
+	case <-signalCtx.Done():
+		log.Printf("shutting down %s backend...", cfg.AppName)
+	case err := <-serverErr:
+		if err != nil && err != http.ErrServerClosed {
+			log.Printf("server failed: %v", err)
+		}
+		return
+	}
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelShutdown()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown timed out: %v", err)
 	}
 }

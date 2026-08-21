@@ -4,7 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/danarrigo/scaean-gate/auth-provider/server/config"
@@ -33,6 +36,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to access database pool: %v", err)
 	}
+	defer sqlDB.Close()
 
 	if err := database.AutoMigrate(db); err != nil {
 		log.Fatalf("failed to run migrations: %v", err)
@@ -69,7 +73,9 @@ func main() {
 		Topic:      cfg.KafkaTopic,
 		OutboxRepo: outboxRepo,
 	}
-	go eventSvc.RunOutboxPublisher(context.Background(), time.Second)
+	outboxCtx, cancelOutbox := context.WithCancel(context.Background())
+	defer cancelOutbox()
+	go eventSvc.RunOutboxPublisher(outboxCtx, time.Second)
 
 	auditSvc := services.AuditService{Repo: auditRepo}
 	authSvc := services.AuthService{
@@ -189,7 +195,30 @@ func main() {
 		admin.GET("/events", auditHandler.ListEvents)
 	}
 
-	if err := r.Run(":" + cfg.ServerPort); err != nil {
-		log.Fatalf("failed to run server: %v", err)
+	server := &http.Server{
+		Addr:              ":" + cfg.ServerPort,
+		Handler:           r,
+		ReadHeaderTimeout: 5 * time.Second,
 	}
+	serverErr := make(chan error, 1)
+	go func() { serverErr <- server.ListenAndServe() }()
+
+	signalCtx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	select {
+	case <-signalCtx.Done():
+		log.Printf("shutting down auth provider...")
+	case err := <-serverErr:
+		if err != nil && err != http.ErrServerClosed {
+			log.Printf("server failed: %v", err)
+		}
+		return
+	}
+
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelShutdown()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("graceful shutdown timed out: %v", err)
+	}
+	cancelOutbox()
 }
