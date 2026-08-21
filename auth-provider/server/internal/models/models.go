@@ -46,6 +46,7 @@ type Application struct {
 	Name                  string    `gorm:"type:varchar(255);not null"`
 	ClientID              string    `gorm:"type:varchar(255);uniqueIndex;not null"`
 	ClientSecretHash      string    `gorm:"type:varchar(255)"`
+	ClientSecretPrefix    string    `gorm:"type:varchar(32)"`
 	Status                string    `gorm:"type:varchar(50);not null;default:'active'"`
 	LaunchURL             string    `gorm:"type:text"`
 	LogoutNotificationURL string    `gorm:"type:text;not null"`
@@ -147,6 +148,8 @@ type Event struct {
 	Status           string     `gorm:"type:varchar(50);not null;default:'pending'"`
 	CreatedAt        time.Time  `gorm:"not null"`
 	PublishedAt      *time.Time
+
+	Deliveries []EventDelivery `gorm:"foreignKey:EventID"`
 }
 
 type EventDelivery struct {

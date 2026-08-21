@@ -31,7 +31,8 @@ type LocalSession struct {
 	ID               uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
 	SessionTokenHash string     `gorm:"type:varchar(255);not null;index" json:"sessionTokenHash"`
 	ExternalUserID   uuid.UUID  `gorm:"type:uuid;not null;index" json:"externalUserId"`
-	CentralSessionID uuid.UUID  `gorm:"type:uuid;not null;index" json:"centralSessionId"`
+	CentralSessionID uuid.UUID  `gorm:"type:uuid;not null;index" json:"central_session_id"`
+	OAuthFlowID      string     `gorm:"column:oauth_flow_id;type:varchar(255);not null;index" json:"oauth_flow_id"`
 	Status           string     `gorm:"type:varchar(50);not null" json:"status"`
 	CreatedAt        time.Time  `gorm:"not null" json:"createdAt"`
 	ExpiresAt        time.Time  `gorm:"not null" json:"expiresAt"`
@@ -50,8 +51,17 @@ type ProfileCache struct {
 }
 
 type ProcessedEvent struct {
-	EventID     uuid.UUID `gorm:"type:uuid;primaryKey" json:"eventId"`
-	EventType   string    `gorm:"type:varchar(100);not null" json:"eventType"`
-	ProcessedAt time.Time `gorm:"not null" json:"processedAt"`
+	EventID     uuid.UUID `gorm:"type:uuid;primaryKey" json:"event_id"`
+	EventType   string    `gorm:"type:varchar(100);not null" json:"event_type"`
+	ProcessedAt time.Time `gorm:"not null" json:"processed_at"`
 	Result      string    `gorm:"type:varchar(50);not null" json:"result"`
+}
+
+type AuthActivity struct {
+	ID             uuid.UUID  `gorm:"type:uuid;default:gen_random_uuid();primaryKey" json:"id"`
+	OAuthFlowID    string     `gorm:"column:oauth_flow_id;type:varchar(255);not null;index" json:"oauth_flow_id"`
+	LocalSessionID *uuid.UUID `gorm:"type:uuid;index" json:"local_session_id,omitempty"`
+	EventType      string     `gorm:"type:varchar(100);not null" json:"event_type"`
+	Result         string     `gorm:"type:varchar(50);not null" json:"result"`
+	CreatedAt      time.Time  `gorm:"not null" json:"created_at"`
 }

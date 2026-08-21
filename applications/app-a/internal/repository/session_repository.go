@@ -96,3 +96,17 @@ func (r *SessionRepository) GetProcessedEvents(limit int) ([]models.ProcessedEve
 	}
 	return events, nil
 }
+
+func (r *SessionRepository) RecordAuthActivity(activity *models.AuthActivity) error {
+	return r.DB.Create(activity).Error
+}
+
+func (r *SessionRepository) GetAuthActivities(flowID string, sessionID uuid.UUID) ([]models.AuthActivity, error) {
+	var activities []models.AuthActivity
+	if err := r.DB.Select("id, oauth_flow_id, event_type, result, created_at").
+		Where("oauth_flow_id = ? OR local_session_id = ?", flowID, sessionID).
+		Order("created_at asc").Find(&activities).Error; err != nil {
+		return nil, err
+	}
+	return activities, nil
+}

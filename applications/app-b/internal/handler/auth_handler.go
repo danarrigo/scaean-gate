@@ -65,7 +65,12 @@ func (h *AuthHandler) Callback(c *gin.Context) {
 	c.SetCookie("oauth_verifier", "", -1, "/", "", h.Cfg.CookieSecure, true)
 	c.SetCookie("oauth_state", "", -1, "/", "", h.Cfg.CookieSecure, true)
 
-	rawLocalToken, err := h.AuthSvc.HandleCallback(c.Request.Context(), code, verifier)
+	if err := h.AuthSvc.RecordAuthorizationCodeReceived(state); err != nil {
+		response.HandleError(c, err)
+		return
+	}
+
+	rawLocalToken, err := h.AuthSvc.HandleCallback(c.Request.Context(), code, verifier, state)
 	if err != nil {
 		response.HandleError(c, err)
 		return
@@ -146,4 +151,35 @@ func (h *AuthHandler) GetEvents(c *gin.Context) {
 	}
 
 	response.JSON(c, http.StatusOK, events)
+}
+
+func (h *AuthHandler) GetActivity(c *gin.Context) {
+	sessionVal, exists := c.Get("session")
+	if !exists {
+		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "Unauthorized")
+		return
+	}
+	activities, err := h.AuthSvc.GetAuthActivities(sessionVal.(*models.LocalSession))
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.JSON(c, http.StatusOK, activities)
+}
+
+func (h *AuthHandler) SessionStatus(c *gin.Context) {
+	rawToken, err := c.Cookie("app_b_session")
+	if err != nil || rawToken == "" {
+		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "No local session")
+		return
+	}
+	session, err := h.AuthSvc.GetSessionStatus(rawToken)
+	if err != nil {
+		response.Error(c, http.StatusUnauthorized, "UNAUTHORIZED", "No local session")
+		return
+	}
+	response.JSON(c, http.StatusOK, gin.H{
+		"status": session.Status,
+		"reason": session.RevokeReason,
+	})
 }

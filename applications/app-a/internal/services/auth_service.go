@@ -49,10 +49,17 @@ func (s *AuthService) GenerateLoginURL() (string, string, string, error) {
 		state,
 	)
 
+	if err := s.recordActivity(state, "AUTH_REDIRECT", "success"); err != nil {
+		return "", "", "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to record authentication activity")
+	}
 	return authURL, verifier, state, nil
 }
 
-func (s *AuthService) HandleCallback(ctx context.Context, code, verifier string) (string, error) {
+func (s *AuthService) RecordAuthorizationCodeReceived(flowID string) error {
+	return s.recordActivity(flowID, "AUTH_CODE_RECEIVED", "success")
+}
+
+func (s *AuthService) HandleCallback(ctx context.Context, code, verifier, flowID string) (string, error) {
 	tokenReqBody := map[string]string{
 		"grant_type":    "authorization_code",
 		"code":          code,
@@ -86,6 +93,9 @@ func (s *AuthService) HandleCallback(ctx context.Context, code, verifier string)
 	var tokenData dto.TokenResponse
 	if err := json.NewDecoder(tokenResp.Body).Decode(&tokenData); err != nil {
 		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to parse token response")
+	}
+	if err := s.recordActivity(flowID, "TOKEN_EXCHANGED", "success"); err != nil {
+		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to record authentication activity")
 	}
 
 	userReq, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/userinfo", s.Cfg.AuthProviderInternalURL), nil)
@@ -142,6 +152,7 @@ func (s *AuthService) HandleCallback(ctx context.Context, code, verifier string)
 		SessionTokenHash: crypto.HashSHA256(rawLocalToken),
 		ExternalUserID:   userUUID,
 		CentralSessionID: centralSessionID,
+		OAuthFlowID:      flowID,
 		Status:           "active",
 		CreatedAt:        now,
 		ExpiresAt:        now.Add(24 * time.Hour),
@@ -149,8 +160,15 @@ func (s *AuthService) HandleCallback(ctx context.Context, code, verifier string)
 	if err := s.Repo.CreateLocalSession(&localSession); err != nil {
 		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to create local session")
 	}
+	if err := s.recordActivityForSession(flowID, localSession.ID, "LOCAL_SESSION_CREATED", "success"); err != nil {
+		return "", response.NewAppError(http.StatusInternalServerError, "INTERNAL_ERROR", "Failed to record authentication activity")
+	}
 
 	return rawLocalToken, nil
+}
+
+func (s *AuthService) GetSessionStatus(rawToken string) (*models.LocalSession, error) {
+	return s.Repo.GetLocalSessionByTokenHash(crypto.HashSHA256(rawToken))
 }
 
 func (s *AuthService) GetMe(session *models.LocalSession) (*dto.MeResponse, error) {
@@ -212,4 +230,27 @@ func (s *AuthService) HandleBackChannelLogout(payload dto.BackChannelLogoutPaylo
 
 func (s *AuthService) GetProcessedEvents() ([]models.ProcessedEvent, error) {
 	return s.Repo.GetProcessedEvents(20)
+}
+
+func (s *AuthService) GetAuthActivities(session *models.LocalSession) ([]models.AuthActivity, error) {
+	return s.Repo.GetAuthActivities(session.OAuthFlowID, session.ID)
+}
+
+func (s *AuthService) recordActivity(flowID, eventType, result string) error {
+	return s.Repo.RecordAuthActivity(&models.AuthActivity{
+		OAuthFlowID: flowID,
+		EventType:   eventType,
+		Result:      result,
+		CreatedAt:   time.Now(),
+	})
+}
+
+func (s *AuthService) recordActivityForSession(flowID string, sessionID uuid.UUID, eventType, result string) error {
+	return s.Repo.RecordAuthActivity(&models.AuthActivity{
+		OAuthFlowID:    flowID,
+		LocalSessionID: &sessionID,
+		EventType:      eventType,
+		Result:         result,
+		CreatedAt:      time.Now(),
+	})
 }

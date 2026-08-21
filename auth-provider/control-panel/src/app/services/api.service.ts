@@ -1,93 +1,31 @@
-import { Injectable, inject } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
 
-@Injectable({
-  providedIn: 'root'
-})
+export interface ApiError { error?: { code?: string; message?: string; requestId?: string } }
+
+@Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
-  private baseUrl = 'http://localhost:8080';
+  readonly base = 'http://localhost:8080';
+  private options = { withCredentials: true };
 
-  private opts = { withCredentials: true };
+  login(body: { email: string; password: string }) { return this.http.post(`${this.base}/login`, body, this.options); }
+  logout() { return this.http.post(`${this.base}/logout`, {}, this.options); }
+  profile() { return this.http.get<any>(`${this.base}/profile`, this.options); }
+  changePassword(body: object) { return this.http.post(`${this.base}/change-password`, body, this.options); }
 
-  login(body: { email: string; password: string }): Observable<any> {
-    return this.http.post(`${this.baseUrl}/login`, body, this.opts);
-  }
+  list(resource: string) { return this.http.get<any[]>(`${this.base}/admin/${resource}`, this.options); }
+  get(resource: string, id: string) { return this.http.get<any>(`${this.base}/admin/${resource}/${id}`, this.options); }
+  create(resource: string, body: object) { return this.http.post<any>(`${this.base}/admin/${resource}`, body, this.options); }
+  update(resource: string, id: string, body: object) { return this.http.put<any>(`${this.base}/admin/${resource}/${id}`, body, this.options); }
+  remove(resource: string, id: string) { return this.http.delete(`${this.base}/admin/${resource}/${id}`, this.options); }
+  status(userId: string, status: string) { return this.http.patch(`${this.base}/admin/users/${userId}/status`, { status }, this.options); }
+  assign(groupId: string, userId: string) { return this.http.post(`${this.base}/admin/groups/${groupId}/users`, { user_id: userId }, this.options); }
+  unassign(groupId: string, userId: string) { return this.http.delete(`${this.base}/admin/groups/${groupId}/users/${userId}`, this.options); }
+  addURI(appId: string, uri: string) { return this.http.post<any>(`${this.base}/admin/apps/${appId}/redirect-uris`, { uri }, this.options); }
+  removeURI(appId: string, uriId: string) { return this.http.delete(`${this.base}/admin/apps/${appId}/redirect-uris/${uriId}`, this.options); }
+}
 
-  logout(): Observable<any> {
-    return this.http.post(`${this.baseUrl}/logout`, {}, this.opts);
-  }
-
-  getProfile(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/profile`, this.opts);
-  }
-
-  changePassword(body: { currentPassword: string; newPassword: string }): Observable<any> {
-    return this.http.post(`${this.baseUrl}/change-password`, body, this.opts);
-  }
-
-  getUsers(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/users`, this.opts);
-  }
-
-  createUser(body: { name: string; email: string; password: string }): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/users`, body, this.opts);
-  }
-
-  updateUserStatus(id: string, status: string): Observable<any> {
-    return this.http.patch(`${this.baseUrl}/admin/users/${id}/status`, { status }, this.opts);
-  }
-
-  getGroups(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/groups`, this.opts);
-  }
-
-  createGroup(body: { name: string; description: string }): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/groups`, body, this.opts);
-  }
-
-  getGroup(groupId: string): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/groups/${groupId}`, this.opts);
-  }
-
-  addGroupMember(groupId: string, userId: string): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/groups/${groupId}/users`, { user_id: userId }, this.opts);
-  }
-
-  removeGroupMember(groupId: string, userId: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/admin/groups/${groupId}/users/${userId}`, this.opts);
-  }
-
-  getApps(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/apps`, this.opts);
-  }
-
-  createApp(body: any): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/apps`, body, this.opts);
-  }
-
-  getPolicies(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/policies`, this.opts);
-  }
-
-  createPolicy(body: { groupId: string; applicationId: string; effect: string }): Observable<any> {
-    return this.http.post(`${this.baseUrl}/admin/policies`, {
-      group_id: body.groupId,
-      application_id: body.applicationId,
-      effect: body.effect
-    }, this.opts);
-  }
-
-  deletePolicy(policyId: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/admin/policies/${policyId}`, this.opts);
-  }
-
-  getAuditLogs(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/audit-logs`, this.opts);
-  }
-
-  getEvents(): Observable<any> {
-    return this.http.get(`${this.baseUrl}/admin/events`, this.opts);
-  }
+export function errorMessage(error: ApiError | any): string {
+  return error?.error?.error?.message || error?.error?.message || 'The request could not be completed.';
 }

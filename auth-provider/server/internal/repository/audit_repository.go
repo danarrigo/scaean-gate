@@ -27,7 +27,7 @@ func (r *AuditRepository) ListAuditLogs() ([]models.AuditLog, error) {
 
 func (r *AuditRepository) ListEvents() ([]models.Event, error) {
 	var events []models.Event
-	if err := r.DB.Order("created_at desc").Limit(100).Find(&events).Error; err != nil {
+	if err := r.DB.Preload("Deliveries.Application").Order("created_at desc").Limit(100).Find(&events).Error; err != nil {
 		return nil, err
 	}
 	return events, nil

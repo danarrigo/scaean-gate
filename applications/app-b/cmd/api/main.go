@@ -28,7 +28,7 @@ func main() {
 		log.Fatalf("failed to connect database: %v", err)
 	}
 
-	if err := db.AutoMigrate(&models.LocalSession{}, &models.ProfileCache{}, &models.ProcessedEvent{}); err != nil {
+	if err := db.AutoMigrate(&models.LocalSession{}, &models.ProfileCache{}, &models.ProcessedEvent{}, &models.AuthActivity{}); err != nil {
 		log.Fatalf("failed to auto-migrate database: %v", err)
 	}
 
@@ -66,6 +66,7 @@ func main() {
 	r.GET("/health", func(c *gin.Context) { c.Status(http.StatusOK) })
 	r.GET("/auth/login", authHandler.Login)
 	r.GET("/auth/callback", authHandler.Callback)
+	r.GET("/session-status", authHandler.SessionStatus)
 	r.POST("/internal/logout", authHandler.InternalLogout)
 
 	protected := r.Group("")
@@ -73,6 +74,7 @@ func main() {
 	{
 		protected.GET("/me", authHandler.Me)
 		protected.GET("/events", authHandler.GetEvents)
+		protected.GET("/activity", authHandler.GetActivity)
 		protected.POST("/logout", authHandler.Logout)
 	}
 

@@ -88,6 +88,7 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 		Name:                  "Apex",
 		ClientID:              "app-a-client-id",
 		ClientSecretHash:      appcrypto.HashSHA256(appAClientSecret),
+		ClientSecretPrefix:    secretPrefix(appAClientSecret),
 		Status:                "active",
 		LaunchURL:             "http://localhost:4201",
 		LogoutNotificationURL: appALogoutURL,
@@ -97,20 +98,21 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 		Name:                  "Bolt",
 		ClientID:              "app-b-client-id",
 		ClientSecretHash:      appcrypto.HashSHA256(appBClientSecret),
+		ClientSecretPrefix:    secretPrefix(appBClientSecret),
 		Status:                "active",
 		LaunchURL:             "http://localhost:4202",
 		LogoutNotificationURL: appBLogoutURL,
 	}
 
 	err = db.Where(models.Application{ClientID: appA.ClientID}).
-		Assign(models.Application{ClientSecretHash: appA.ClientSecretHash, LogoutNotificationURL: appA.LogoutNotificationURL}).
+		Assign(models.Application{ClientSecretHash: appA.ClientSecretHash, ClientSecretPrefix: appA.ClientSecretPrefix, LogoutNotificationURL: appA.LogoutNotificationURL}).
 		FirstOrCreate(&appA).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
 
 	err = db.Where(models.Application{ClientID: appB.ClientID}).
-		Assign(models.Application{ClientSecretHash: appB.ClientSecretHash, LogoutNotificationURL: appB.LogoutNotificationURL}).
+		Assign(models.Application{ClientSecretHash: appB.ClientSecretHash, ClientSecretPrefix: appB.ClientSecretPrefix, LogoutNotificationURL: appB.LogoutNotificationURL}).
 		FirstOrCreate(&appB).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
@@ -164,4 +166,11 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 	}
 
 	return nil
+}
+
+func secretPrefix(secret string) string {
+	if len(secret) <= 11 {
+		return secret
+	}
+	return secret[:11]
 }

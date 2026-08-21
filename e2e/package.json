@@ -1,0 +1,15 @@
+{
+  "name": "scaean-gate-e2e",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "install:browsers": "playwright install chromium",
+    "compose:up": "docker compose -p scaean-gate-e2e -f ../docker-compose.yml up -d --build --wait",
+    "compose:down": "docker compose -p scaean-gate-e2e -f ../docker-compose.yml down -v --remove-orphans",
+    "test:docker": "sh ./run-docker.sh"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "dotenv": "^17.2.1"
+  }
+}

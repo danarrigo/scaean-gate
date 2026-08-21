@@ -291,17 +291,21 @@ func (s *AdminService) ListApps() ([]dto.AppResponse, error) {
 	var res []dto.AppResponse
 	for _, a := range apps {
 		var uris []string
+		var uriItems []dto.RedirectURIResponse
 		for _, u := range a.RedirectURIs {
 			uris = append(uris, u.RedirectURI)
+			uriItems = append(uriItems, dto.RedirectURIResponse{ID: u.ID, RedirectURI: u.RedirectURI})
 		}
 		res = append(res, dto.AppResponse{
 			ID:                    a.ID,
 			Name:                  a.Name,
 			ClientID:              a.ClientID,
+			ClientSecretPrefix:    a.ClientSecretPrefix,
 			Status:                a.Status,
 			LaunchURL:             a.LaunchURL,
 			LogoutNotificationURL: a.LogoutNotificationURL,
 			RedirectURIs:          uris,
+			RedirectURIItems:      uriItems,
 			CreatedAt:             a.CreatedAt,
 		})
 	}
@@ -315,18 +319,22 @@ func (s *AdminService) GetAppByID(id uuid.UUID) (*dto.AppResponse, error) {
 	}
 
 	var uris []string
+	var uriItems []dto.RedirectURIResponse
 	for _, u := range a.RedirectURIs {
 		uris = append(uris, u.RedirectURI)
+		uriItems = append(uriItems, dto.RedirectURIResponse{ID: u.ID, RedirectURI: u.RedirectURI})
 	}
 
 	return &dto.AppResponse{
 		ID:                    a.ID,
 		Name:                  a.Name,
 		ClientID:              a.ClientID,
+		ClientSecretPrefix:    a.ClientSecretPrefix,
 		Status:                a.Status,
 		LaunchURL:             a.LaunchURL,
 		LogoutNotificationURL: a.LogoutNotificationURL,
 		RedirectURIs:          uris,
+		RedirectURIItems:      uriItems,
 		CreatedAt:             a.CreatedAt,
 	}, nil
 }
@@ -338,16 +346,22 @@ func (s *AdminService) CreateApp(req dto.CreateAppRequest) (*dto.CreateAppRespon
 	}
 	clientID := fmt.Sprintf("app_%s", randomID[:12])
 
-	rawClientSecret, err := crypto.GenerateRandomString()
+	secretValue, err := crypto.GenerateRandomString()
 	if err != nil {
 		return nil, err
 	}
+	rawClientSecret := "sg_" + secretValue
 	hashedSecret := crypto.HashSHA256(rawClientSecret)
+	secretPrefix := rawClientSecret
+	if len(secretPrefix) > 11 {
+		secretPrefix = secretPrefix[:11]
+	}
 
 	app := models.Application{
 		Name:                  req.Name,
 		ClientID:              clientID,
 		ClientSecretHash:      hashedSecret,
+		ClientSecretPrefix:    secretPrefix,
 		Status:                "active",
 		LaunchURL:             req.LaunchURL,
 		LogoutNotificationURL: req.LogoutNotificationURL,
@@ -362,6 +376,7 @@ func (s *AdminService) CreateApp(req dto.CreateAppRequest) (*dto.CreateAppRespon
 		Name:                  app.Name,
 		ClientID:              app.ClientID,
 		ClientSecret:          rawClientSecret,
+		ClientSecretPrefix:    app.ClientSecretPrefix,
 		Status:                app.Status,
 		LaunchURL:             app.LaunchURL,
 		LogoutNotificationURL: app.LogoutNotificationURL,
@@ -507,14 +522,27 @@ func (s *AdminService) ListEvents() ([]dto.EventResponse, error) {
 
 	var res []dto.EventResponse
 	for _, e := range events {
+		deliveries := make([]dto.EventDeliveryResponse, 0, len(e.Deliveries))
+		for _, delivery := range e.Deliveries {
+			deliveries = append(deliveries, dto.EventDeliveryResponse{
+				ID:              delivery.ID,
+				ApplicationID:   delivery.ApplicationID,
+				ApplicationName: delivery.Application.Name,
+				Status:          delivery.Status,
+				AttemptCount:    delivery.AttemptCount,
+				NextRetryAt:     delivery.NextRetryAt,
+				ProcessedAt:     delivery.ProcessedAt,
+				LastError:       delivery.LastError,
+			})
+		}
 		res = append(res, dto.EventResponse{
 			ID:            e.ID,
 			EventType:     e.EventType,
 			UserID:        e.UserID,
 			ApplicationID: e.ApplicationID,
-			Payload:       e.Payload,
 			Status:        e.Status,
 			CreatedAt:     e.CreatedAt,
+			Deliveries:    deliveries,
 		})
 	}
 	return res, nil
