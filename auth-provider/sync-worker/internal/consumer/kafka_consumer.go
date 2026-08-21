@@ -1,4 +1,4 @@
-// Package consumer
+// Package consumer contains logic for consuming kafka records
 package consumer
 
 import (
