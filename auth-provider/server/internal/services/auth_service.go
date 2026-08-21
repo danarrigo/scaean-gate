@@ -87,10 +87,9 @@ func (s *AuthService) Login(email, password, ipAddress, userAgent string) (*Logi
 }
 
 func (s *AuthService) Logout(cookie, ipAddress string) error {
-	hashedToken := crypto.HashSHA256(cookie)
-	ssoSession, err := s.SessionRepo.GetSSOSessionByHash(hashedToken)
+	ssoSession, err := s.getActiveSession(cookie)
 	if err != nil {
-		return response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid Session")
+		return err
 	}
 
 	event := models.Event{
@@ -121,11 +120,10 @@ func (s *AuthService) ChangePassword(cookie string, req dto.ChangePasswordReques
 		s.AuditSvc.Log("PASSWORD_CHANGED", userID, userID, nil, nil, result, ipAddress, reason)
 	}()
 
-	hashedToken := crypto.HashSHA256(cookie)
-	session, err := s.SessionRepo.GetSSOSessionByHash(hashedToken)
+	session, err := s.getActiveSession(cookie)
 	if err != nil {
 		reason = "UNAUTHORIZED"
-		return response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired session")
+		return err
 	}
 
 	userID = &session.UserID
@@ -165,15 +163,14 @@ func (s *AuthService) ChangePassword(cookie string, req dto.ChangePasswordReques
 }
 
 func (s *AuthService) GetProfile(cookie string) (*dto.ProfileData, error) {
-	hashedToken := crypto.HashSHA256(cookie)
-	session, err := s.SessionRepo.GetSSOSessionByHash(hashedToken)
+	session, err := s.getActiveSession(cookie)
 	if err != nil {
-		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired session")
+		return nil, err
 	}
 
 	user, err := s.UserRepo.GetUserWithGroupsByID(session.UserID)
-	if err != nil {
-		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "User not found")
+	if err != nil || user.Status != "active" {
+		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "User not found or inactive")
 	}
 
 	groups := make([]string, 0, len(user.Groups))
@@ -187,6 +184,17 @@ func (s *AuthService) GetProfile(cookie string) (*dto.ProfileData, error) {
 		Email:  user.Email,
 		Groups: groups,
 	}, nil
+}
+
+func (s *AuthService) getActiveSession(cookie string) (models.SSOSession, error) {
+	if cookie == "" {
+		return models.SSOSession{}, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired session")
+	}
+	session, err := s.SessionRepo.GetSSOSessionByHash(crypto.HashSHA256(cookie))
+	if err != nil || session.Status != "active" || session.ExpiresAt.Before(time.Now()) {
+		return models.SSOSession{}, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Invalid or expired session")
+	}
+	return session, nil
 }
 
 func (s *AuthService) GetUserByEmail(email string) (models.User, error) {

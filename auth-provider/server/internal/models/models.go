@@ -11,12 +11,12 @@ import (
 type User struct {
 	ID           uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
 	Name         string         `gorm:"type:varchar(255);not null"`
-	Email        string         `gorm:"type:varchar(255);not null;uniqueIndex:idx_user_email_deleted"`
+	Email        string         `gorm:"type:varchar(255);not null;uniqueIndex:idx_user_email_active,where:deleted_at IS NULL"`
 	PasswordHash string         `gorm:"type:varchar(255);not null"`
 	Status       string         `gorm:"type:varchar(50);not null;default:'active'"`
 	CreatedAt    time.Time      `gorm:"not null"`
 	UpdatedAt    time.Time      `gorm:"not null"`
-	DeletedAt    gorm.DeletedAt `gorm:"index;uniqueIndex:idx_user_email_deleted"`
+	DeletedAt    gorm.DeletedAt `gorm:"index"`
 
 	Groups []Group `gorm:"many2many:user_groups;"`
 }

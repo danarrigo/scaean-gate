@@ -20,6 +20,7 @@ type OauthService struct {
 	AppRepo     repository.AppRepository
 	PolicyRepo  repository.PolicyRepository
 	OAuthRepo   repository.OAuthRepository
+	AuditRepo   repository.AuditRepository
 }
 
 func (s *OauthService) AuthorizeService(rawToken string, req dto.AuthorizeRequest) (string, error) {
@@ -51,7 +52,21 @@ func (s *OauthService) AuthorizeService(rawToken string, req dto.AuthorizeReques
 	}
 
 	hasAccess, err := s.PolicyRepo.HasUserAccess(user.ID, app.ID)
-	if err != nil || !hasAccess {
+	if err != nil {
+		return "", err
+	}
+	if !hasAccess {
+		auditLog := models.AuditLog{
+			EventType:     "PolicyDenied",
+			UserID:        &user.ID,
+			ApplicationID: &app.ID,
+			SessionID:     &session.ID,
+			Result:        "failed",
+			Metadata:      `{"reason":"ACCESS_DENIED"}`,
+		}
+		if err := s.AuditRepo.CreateAuditLog(&auditLog); err != nil {
+			return "", err
+		}
 		return "", response.NewAppError(http.StatusForbidden, "ACCESS_DENIED", "Access Denied by Policy")
 	}
 
@@ -167,6 +182,14 @@ func (s *OauthService) GetUserInfo(rawAccessToken string) (*dto.UserInfoResponse
 	user, err := s.UserRepo.GetUserWithGroupsByID(accessToken.UserID)
 	if err != nil || user.Status != "active" {
 		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "User is inactive or not found")
+	}
+	app, err := s.AppRepo.GetAppByID(accessToken.ApplicationID)
+	if err != nil || app.Status != "active" {
+		return nil, response.NewAppError(http.StatusUnauthorized, "UNAUTHORIZED", "Application is inactive or not found")
+	}
+	hasAccess, err := s.PolicyRepo.HasUserAccess(user.ID, app.ID)
+	if err != nil || !hasAccess {
+		return nil, response.NewAppError(http.StatusForbidden, "ACCESS_DENIED", "Access Denied by Policy")
 	}
 
 	groups := make([]string, 0, len(user.Groups))

@@ -10,6 +10,9 @@ import (
 )
 
 func AutoMigrate(db *gorm.DB) error {
+	if err := db.Exec(`DROP INDEX IF EXISTS "idx_user_email_deleted"`).Error; err != nil {
+		return fmt.Errorf("drop obsolete user email index: %w", err)
+	}
 	if err := db.SetupJoinTable(&models.User{}, "Groups", &models.UserGroup{}); err != nil {
 		return fmt.Errorf("configure user-group join table: %w", err)
 	}

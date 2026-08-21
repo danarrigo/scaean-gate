@@ -134,6 +134,10 @@ func (s *AdminService) UpdateUser(id uuid.UUID, req dto.UpdateUserRequest) (*dto
 		return nil, response.NewAppError(http.StatusNotFound, "NOT_FOUND", "User not found")
 	}
 
+	if existing, lookupErr := s.UserRepo.GetUserByEmail(req.Email); lookupErr == nil && existing.ID != id {
+		return nil, response.NewAppError(http.StatusConflict, "CONFLICT", "Email already registered")
+	}
+
 	user.Name = req.Name
 	user.Email = req.Email
 	passwordChanged := req.Password != ""

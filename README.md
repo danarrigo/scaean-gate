@@ -45,6 +45,8 @@ docker compose ps
 
 ### Pembuatan Database, Migrasi, dan Seeder
 
+Migration dan seeder berjalan otomatis saat `docker compose up`; tidak ada perintah tambahan yang diperlukan.
+
 Seeder membuat data berikut:
 
 - `admin@scaean-gate.com` di dalam grup **Admin**

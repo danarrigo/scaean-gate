@@ -43,7 +43,7 @@ func (d *HTTPDispatcher) Dispatch(ctx context.Context, event models.Event) error
 	var targetApps []models.Application
 	if event.EventType == "AccessPolicyChanged" && event.ApplicationID != nil {
 		var app models.Application
-		if err := d.DB.Where("id = ? AND status = 'active'", *event.ApplicationID).First(&app).Error; err != nil {
+		if err := d.DB.Unscoped().Where("id = ?", *event.ApplicationID).First(&app).Error; err != nil {
 			return err
 		}
 		targetApps = append(targetApps, app)

@@ -33,19 +33,23 @@ func enqueueLostAccessEvents(tx *gorm.DB, userIDs, applicationIDs []uuid.UUID) e
 			if remaining > 0 {
 				continue
 			}
-			event := models.Event{
-				EventType:     "AccessPolicyChanged",
-				UserID:        userID,
-				ApplicationID: &applicationID,
-				Payload:       `{"reason":"ACCESS_POLICY_CHANGED"}`,
-				Status:        "pending",
-			}
-			if err := tx.Create(&event).Error; err != nil {
+			if err := enqueueAccessPolicyChangedEvent(tx, userID, applicationID); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func enqueueAccessPolicyChangedEvent(tx *gorm.DB, userID, applicationID uuid.UUID) error {
+	event := models.Event{
+		EventType:     "AccessPolicyChanged",
+		UserID:        userID,
+		ApplicationID: &applicationID,
+		Payload:       `{"reason":"ACCESS_POLICY_CHANGED"}`,
+		Status:        "pending",
+	}
+	return tx.Create(&event).Error
 }
 
 func uniqueUUIDs(values []uuid.UUID) []uuid.UUID {

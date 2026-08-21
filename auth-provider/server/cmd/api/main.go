@@ -89,6 +89,7 @@ func main() {
 		AppRepo:     appRepo,
 		PolicyRepo:  policyRepo,
 		OAuthRepo:   oauthRepo,
+		AuditRepo:   auditRepo,
 	}
 	adminSvc := services.AdminService{
 		UserRepo:    userRepo,

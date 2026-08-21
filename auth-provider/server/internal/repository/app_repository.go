@@ -55,7 +55,32 @@ func (r *AppRepository) CreateApp(app *models.Application, redirectURIs []string
 }
 
 func (r *AppRepository) UpdateApp(app *models.Application) error {
-	return r.DB.Save(app).Error
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		var current models.Application
+		if err := tx.Where("id = ?", app.ID).First(&current).Error; err != nil {
+			return err
+		}
+		deactivating := current.Status == "active" && app.Status == "inactive"
+		var userIDs []uuid.UUID
+		if deactivating {
+			if err := tx.Table("user_groups").
+				Distinct("user_groups.user_id").
+				Joins("JOIN application_group_policies ON application_group_policies.group_id = user_groups.group_id").
+				Where("application_group_policies.application_id = ? AND application_group_policies.effect = 'allow' AND application_group_policies.deleted_at IS NULL AND user_groups.deleted_at IS NULL", app.ID).
+				Pluck("user_groups.user_id", &userIDs).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Save(app).Error; err != nil {
+			return err
+		}
+		for _, userID := range uniqueUUIDs(userIDs) {
+			if err := enqueueAccessPolicyChangedEvent(tx, userID, app.ID); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *AppRepository) DeleteApp(id uuid.UUID) error {
