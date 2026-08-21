@@ -8,6 +8,7 @@ import (
 )
 
 type Config struct {
+	HealthPort        string
 	KafkaBrokers      string
 	KafkaTopic        string
 	KafkaGroupID      string
@@ -25,6 +26,7 @@ func LoadConfig() (*Config, error) {
 	_ = godotenv.Load()
 
 	cfg := &Config{
+		HealthPort:        getEnvWithDefault("HEALTH_PORT", "8083"),
 		KafkaBrokers:      getEnvWithDefault("KAFKA_BROKERS", "localhost:9092"),
 		KafkaTopic:        getEnvWithDefault("KAFKA_TOPIC", "sso-session-events"),
 		KafkaGroupID:      getEnvWithDefault("KAFKA_GROUP_ID", "sync-worker-group"),

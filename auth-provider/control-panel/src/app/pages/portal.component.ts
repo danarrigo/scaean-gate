@@ -60,9 +60,9 @@ type Tab = 'users' | 'groups' | 'apps' | 'policies' | 'audit' | 'events';
               }
 
               @if (tab === 'policies') {
-                <section class="paper-card"><div class="section-head"><h2>Access policies</h2><button class="primary small" (click)="showPolicy = true">Add policy</button></div>
+                <section class="paper-card"><div class="section-head"><h2>Access policies</h2><button class="primary small" (click)="openPolicy()">Add policy</button></div>
                   <div class="table-wrap"><table><thead><tr><th>Group</th><th>Application</th><th>Effect</th><th></th></tr></thead><tbody>
-                    @for (p of filtered(policies); track p.id) { <tr><td>{{ p.group_name }}</td><td>{{ p.application_name }}</td><td><span class="status active">{{ p.effect }}</span></td><td class="actions"><button class="danger" (click)="deletePolicy(p)">Revoke</button></td></tr> }
+                    @for (p of filtered(policies); track p.id) { <tr><td>{{ p.group_name }}</td><td>{{ p.application_name }}</td><td><span class="status active">{{ p.effect }}</span></td><td class="actions"><button (click)="openPolicy(p)">Edit</button><button class="danger" (click)="deletePolicy(p)">Revoke</button></td></tr> }
                   </tbody></table></div>
                 </section>
               }
@@ -99,7 +99,7 @@ type Tab = 'users' | 'groups' | 'apps' | 'policies' | 'audit' | 'events';
       @if (modal === 'uris') { <div class="inline-form"><input [(ngModel)]="newURI" type="url" placeholder="https://app.example/callback" /><button class="primary small" (click)="addURI()">Add</button></div><ul class="plain-list">@for (uri of selectedApp.redirect_uri_items || []; track uri.id) { <li><code>{{ uri.redirect_uri }}</code><button class="danger" (click)="removeURI(uri)">Remove</button></li> }</ul> }
     </section></div> }
 
-    @if (showPolicy) { <div class="modal-backdrop"><section class="modal"><div class="section-head"><h2>Add access policy</h2><button class="icon-button" (click)="showPolicy = false">×</button></div><form (ngSubmit)="createPolicy()"><label>Group<select name="group" [(ngModel)]="policyForm.group_id" required><option value="">Choose group</option>@for (g of groups; track g.id) { <option [value]="g.id">{{ g.name }}</option> }</select></label><label>Application<select name="app" [(ngModel)]="policyForm.application_id" required><option value="">Choose application</option>@for (a of apps; track a.id) { <option [value]="a.id">{{ a.name }}</option> }</select></label><button class="primary">Create allow policy</button></form></section></div> }
+    @if (showPolicy) { <div class="modal-backdrop"><section class="modal"><div class="section-head"><h2>{{ policyForm.id ? 'Edit access policy' : 'Add access policy' }}</h2><button class="icon-button" (click)="showPolicy = false">×</button></div><form (ngSubmit)="savePolicy()"><label>Group<select name="group" [(ngModel)]="policyForm.group_id" required><option value="">Choose group</option>@for (g of groups; track g.id) { <option [value]="g.id">{{ g.name }}</option> }</select></label><label>Application<select name="app" [(ngModel)]="policyForm.application_id" required><option value="">Choose application</option>@for (a of apps; track a.id) { <option [value]="a.id">{{ a.name }}</option> }</select></label><label>Effect<select name="effect" [(ngModel)]="policyForm.effect"><option value="allow">Allow</option><option value="deny">Deny</option></select></label><button class="primary">{{ policyForm.id ? 'Save policy' : 'Create policy' }}</button></form></section></div> }
 
     @if (createdSecret) { <div class="modal-backdrop"><section class="modal secret-modal"><p class="eyebrow">Shown once</p><h2>Copy the client secret</h2><p>This key cannot be viewed again. Store it securely now.</p><code class="secret">{{ createdSecret }}</code><button class="primary" (click)="copySecret()">{{ copied ? 'Copied' : 'Copy secret' }}</button><button (click)="createdSecret = ''">I have stored it</button></section></div> }
   `,
@@ -110,7 +110,7 @@ export class PortalComponent implements OnInit {
   users: any[] = []; groups: any[] = []; apps: any[] = []; policies: any[] = []; audit: any[] = []; events: any[] = [];
   modal = ''; showPolicy = false; selectedGroup: any; selectedApp: any; groupMembers: any[] = []; selectedUser = ''; newURI = '';
   createdSecret = ''; copied = false;
-  userForm: any = {}; groupForm: any = {}; appForm: any = {}; policyForm = { group_id: '', application_id: '', effect: 'allow' };
+  userForm: any = {}; groupForm: any = {}; appForm: any = {}; policyForm: any = { group_id: '', application_id: '', effect: 'allow' };
   nav: { id: Tab; number: string; label: string }[] = [{id:'users',number:'I',label:'Users'},{id:'groups',number:'II',label:'Groups'},{id:'apps',number:'III',label:'Applications'},{id:'policies',number:'IV',label:'Policies'},{id:'audit',number:'V',label:'Audit logs'},{id:'events',number:'VI',label:'Deliveries'}];
   get title() { return this.nav.find(n => n.id === this.tab)?.label || ''; }
   get modalTitle() { return this.modal === 'user' ? (this.userForm.id ? 'Edit user' : 'Add user') : this.modal === 'group' ? (this.groupForm.id ? 'Edit group' : 'Add group') : this.modal === 'members' ? `${this.selectedGroup?.name} members` : this.modal === 'app' ? (this.appForm.id ? 'Edit application' : 'Register application') : 'Redirect URIs'; }
@@ -149,6 +149,7 @@ export class PortalComponent implements OnInit {
   removeURI(uri:any){if(confirm('Remove this redirect URI?'))this.api.removeURI(this.selectedApp.id,uri.id).subscribe({next:()=>{this.manageURIs(this.selectedApp);this.load('apps');this.notify('Redirect URI removed.');},error:e=>this.fail(e)});}
   copySecret(){navigator.clipboard.writeText(this.createdSecret).then(()=>this.copied=true);}
 
-  createPolicy(){this.api.create('policies',this.policyForm).subscribe({next:()=>{this.showPolicy=false;this.load('policies');this.notify('Policy created.');},error:e=>this.fail(e)});}
+  openPolicy(policy?:any){this.policyForm=policy?{id:policy.id,group_id:policy.group_id,application_id:policy.application_id,effect:policy.effect}:{group_id:'',application_id:'',effect:'allow'};this.showPolicy=true;}
+  savePolicy(){const{id,...body}=this.policyForm;const request=id?this.api.update('policies',id,body):this.api.create('policies',body);request.subscribe({next:()=>{this.showPolicy=false;this.load('policies');this.notify(id?'Policy updated.':'Policy created.');},error:e=>this.fail(e)});}
   deletePolicy(p:any){if(confirm(`Revoke ${p.group_name} access to ${p.application_name}?`))this.api.remove('policies',p.id).subscribe({next:()=>{this.load('policies');this.notify('Policy revoked.');},error:e=>this.fail(e)});}
 }

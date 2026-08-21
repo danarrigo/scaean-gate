@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/danarrigo/scaean-gate/applications/app-a/config"
 	"github.com/danarrigo/scaean-gate/applications/app-a/internal/handler"
@@ -26,6 +28,10 @@ func main() {
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("failed to access database pool: %v", err)
 	}
 
 	if err := db.AutoMigrate(&models.LocalSession{}, &models.ProfileCache{}, &models.ProcessedEvent{}, &models.AuthActivity{}); err != nil {
@@ -63,7 +69,21 @@ func main() {
 		c.Next()
 	})
 
-	r.GET("/health", func(c *gin.Context) { c.Status(http.StatusOK) })
+	liveHandler := func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "alive"})
+	}
+	readyHandler := func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		if err := sqlDB.PingContext(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready", "dependency": "database"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+	}
+	r.GET("/health", readyHandler)
+	r.GET("/health/live", liveHandler)
+	r.GET("/health/ready", readyHandler)
 	r.GET("/auth/login", authHandler.Login)
 	r.GET("/auth/callback", authHandler.Callback)
 	r.GET("/session-status", authHandler.SessionStatus)

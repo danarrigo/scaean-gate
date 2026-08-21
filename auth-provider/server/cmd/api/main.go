@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"strings"
 	"time"
 
@@ -27,6 +28,10 @@ func main() {
 	db, err := gorm.Open(postgres.Open(cfg.DSN()), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect database: %v", err)
+	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("failed to access database pool: %v", err)
 	}
 
 	if err := database.AutoMigrate(db); err != nil {
@@ -121,7 +126,25 @@ func main() {
 	r.Use(middleware.CORSMiddleware(cfg.AllowedOrigins))
 	r.Use(middleware.LoggerMiddleware)
 
-	r.GET("/health", func(c *gin.Context) { c.Status(200) })
+	liveHandler := func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "alive"})
+	}
+	readyHandler := func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		if err := sqlDB.PingContext(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready", "dependency": "database"})
+			return
+		}
+		if err := kafkaClient.Ping(ctx); err != nil {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"status": "not_ready", "dependency": "broker"})
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{"status": "ready"})
+	}
+	r.GET("/health", readyHandler)
+	r.GET("/health/live", liveHandler)
+	r.GET("/health/ready", readyHandler)
 	r.POST("/login", authHandler.LoginHandler)
 	r.POST("/logout", authHandler.Logout)
 	r.POST("/change-password", authHandler.ChangePassword)
@@ -158,6 +181,8 @@ func main() {
 
 		admin.GET("/policies", policyHandler.ListPolicies)
 		admin.POST("/policies", policyHandler.CreatePolicy)
+		admin.GET("/policies/:id", policyHandler.GetPolicy)
+		admin.PUT("/policies/:id", policyHandler.UpdatePolicy)
 		admin.DELETE("/policies/:id", policyHandler.DeletePolicy)
 
 		admin.GET("/audit-logs", auditHandler.ListAuditLogs)

@@ -446,6 +446,14 @@ func (s *AdminService) ListPolicies() ([]dto.PolicyResponse, error) {
 	return res, nil
 }
 
+func (s *AdminService) GetPolicyByID(id uuid.UUID) (*dto.PolicyResponse, error) {
+	policy, err := s.PolicyRepo.GetPolicyByID(id)
+	if err != nil {
+		return nil, response.NewAppError(http.StatusNotFound, "NOT_FOUND", "Policy not found")
+	}
+	return policyDTO(policy), nil
+}
+
 func (s *AdminService) CreatePolicy(req dto.CreatePolicyRequest) (*dto.PolicyResponse, error) {
 	if _, err := s.AppRepo.GetAppByID(req.ApplicationID); err != nil {
 		return nil, response.NewAppError(http.StatusNotFound, "NOT_FOUND", "App not found")
@@ -479,6 +487,35 @@ func (s *AdminService) CreatePolicy(req dto.CreatePolicyRequest) (*dto.PolicyRes
 		Effect:          created.Effect,
 		CreatedAt:       created.CreatedAt,
 	}, nil
+}
+
+func (s *AdminService) UpdatePolicy(id uuid.UUID, req dto.UpdatePolicyRequest) (*dto.PolicyResponse, error) {
+	if _, err := s.PolicyRepo.GetPolicyByID(id); err != nil {
+		return nil, response.NewAppError(http.StatusNotFound, "NOT_FOUND", "Policy not found")
+	}
+	if _, err := s.AppRepo.GetAppByID(req.ApplicationID); err != nil {
+		return nil, response.NewAppError(http.StatusNotFound, "NOT_FOUND", "App not found")
+	}
+	if _, err := s.GroupRepo.GetGroupByID(req.GroupID); err != nil {
+		return nil, response.NewAppError(http.StatusNotFound, "NOT_FOUND", "Group not found")
+	}
+	policy, err := s.PolicyRepo.UpdatePolicyWithEvents(id, req.ApplicationID, req.GroupID, req.Effect)
+	if err != nil {
+		return nil, err
+	}
+	return policyDTO(policy), nil
+}
+
+func policyDTO(policy models.ApplicationGroupPolicy) *dto.PolicyResponse {
+	return &dto.PolicyResponse{
+		ID:              policy.ID,
+		ApplicationID:   policy.ApplicationID,
+		ApplicationName: policy.Application.Name,
+		GroupID:         policy.GroupID,
+		GroupName:       policy.Group.Name,
+		Effect:          policy.Effect,
+		CreatedAt:       policy.CreatedAt,
+	}
 }
 
 func (s *AdminService) DeletePolicy(id uuid.UUID) error {

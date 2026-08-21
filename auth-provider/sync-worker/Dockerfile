@@ -9,4 +9,5 @@ FROM alpine:3.22
 RUN addgroup -S app && adduser -S -G app app
 COPY --from=build /bin/sync-worker /usr/local/bin/sync-worker
 USER app
+EXPOSE 8083
 ENTRYPOINT ["sync-worker"]

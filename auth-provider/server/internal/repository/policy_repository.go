@@ -61,6 +61,33 @@ func (r *PolicyRepository) CreatePolicy(policy *models.ApplicationGroupPolicy) e
 	return r.DB.Create(policy).Error
 }
 
+func (r *PolicyRepository) UpdatePolicyWithEvents(id, applicationID, groupID uuid.UUID, effect string) (models.ApplicationGroupPolicy, error) {
+	var updated models.ApplicationGroupPolicy
+	err := r.DB.Transaction(func(tx *gorm.DB) error {
+		var current models.ApplicationGroupPolicy
+		if err := tx.Where("id = ?", id).First(&current).Error; err != nil {
+			return err
+		}
+		oldApplicationID := current.ApplicationID
+		var affectedUserIDs []uuid.UUID
+		if err := tx.Model(&models.UserGroup{}).Where("group_id = ?", current.GroupID).Pluck("user_id", &affectedUserIDs).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&current).Updates(map[string]any{
+			"application_id": applicationID,
+			"group_id":       groupID,
+			"effect":         effect,
+		}).Error; err != nil {
+			return err
+		}
+		if err := enqueueLostAccessEvents(tx, affectedUserIDs, []uuid.UUID{oldApplicationID}); err != nil {
+			return err
+		}
+		return tx.Preload("Application").Preload("Group").First(&updated, "id = ?", id).Error
+	})
+	return updated, err
+}
+
 func (r *PolicyRepository) DeletePolicyWithEvents(id, applicationID, groupID uuid.UUID) error {
 	return r.DB.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Delete(&models.ApplicationGroupPolicy{}, "id = ?", id).Error; err != nil {

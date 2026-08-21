@@ -23,6 +23,20 @@ func (h *PolicyHandler) ListPolicies(c *gin.Context) {
 	response.JSON(c, http.StatusOK, policies)
 }
 
+func (h *PolicyHandler) GetPolicy(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_ID", "Invalid policy ID format")
+		return
+	}
+	policy, err := h.AdminSvc.GetPolicyByID(id)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.JSON(c, http.StatusOK, policy)
+}
+
 func (h *PolicyHandler) CreatePolicy(c *gin.Context) {
 	var req dto.CreatePolicyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -36,6 +50,25 @@ func (h *PolicyHandler) CreatePolicy(c *gin.Context) {
 		return
 	}
 	response.JSON(c, http.StatusCreated, policy)
+}
+
+func (h *PolicyHandler) UpdatePolicy(c *gin.Context) {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_ID", "Invalid policy ID format")
+		return
+	}
+	var req dto.UpdatePolicyRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "INVALID_REQUEST", "Invalid request body")
+		return
+	}
+	policy, err := h.AdminSvc.UpdatePolicy(id, req)
+	if err != nil {
+		response.HandleError(c, err)
+		return
+	}
+	response.JSON(c, http.StatusOK, policy)
 }
 
 func (h *PolicyHandler) DeletePolicy(c *gin.Context) {

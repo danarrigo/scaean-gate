@@ -91,7 +91,7 @@ services:
       kafka-init:
         condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -123,6 +123,11 @@ services:
         condition: service_healthy
       auth-provider:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8081/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   app-b:
     build: ./applications/app-b
@@ -151,11 +156,17 @@ services:
         condition: service_healthy
       auth-provider:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8082/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   sync-worker:
     build: ./auth-provider/sync-worker
     restart: unless-stopped
     environment:
+      HEALTH_PORT: 8083
       KAFKA_BROKERS: kafka:29092
       KAFKA_TOPIC: sso-session-events
       KAFKA_GROUP_ID: sync-worker-group
@@ -173,9 +184,14 @@ services:
       kafka-init:
         condition: service_completed_successfully
       app-a:
-        condition: service_started
+        condition: service_healthy
       app-b:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8083/health/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   control-panel:
     build: ./auth-provider/control-panel
@@ -193,7 +209,7 @@ services:
       - "4201:80"
     depends_on:
       app-a:
-        condition: service_started
+        condition: service_healthy
 
   app-b-client:
     build: ./applications/app-b/client
@@ -202,7 +218,7 @@ services:
       - "4202:80"
     depends_on:
       app-b:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   pgdata:

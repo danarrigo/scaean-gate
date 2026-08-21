@@ -124,6 +124,12 @@ type CreatePolicyRequest struct {
 	Effect        string    `json:"effect" binding:"required,oneof=allow deny"`
 }
 
+type UpdatePolicyRequest struct {
+	ApplicationID uuid.UUID `json:"application_id" binding:"required"`
+	GroupID       uuid.UUID `json:"group_id" binding:"required"`
+	Effect        string    `json:"effect" binding:"required,oneof=allow deny"`
+}
+
 type PolicyResponse struct {
 	ID              uuid.UUID `json:"id"`
 	ApplicationID   uuid.UUID `json:"application_id"`
