@@ -1,6 +1,8 @@
 # Scaean Gate
 
-Penyedia Identitas dan Otorisasi terpusat dengan OAuth 2.0 Authorization Code + PKCE, akses aplikasi berbasis grup, sesi independen pada setiap relying application, serta pencabutan sesi berbasis Kafka.
+A centralized Identity and Authorization Provider with OAuth 2.0 Authorization Code + PKCE, group-based application access, independent relying-application sessions, and Kafka-backed session revocation.
+
+App A bernama **Apex**, sedangkan App B bernama **Bolt**.
 
 ## Identitas
 
@@ -231,35 +233,15 @@ Auth Provider memiliki sesi SSO pusat. Apex dan Bolt masing-masing memiliki sesi
 
 ## Tech Stack dan Versi
 
-Versi berikut merupakan versi image yang dikunci atau versi dependency langsung yang telah di-resolve pada lock file/module file yang di-commit.
-
-| Kategori | Teknologi | Versi |
+| Bagian | Teknologi | Versi |
 | --- | --- | --- |
-| Bahasa/build image backend | Go | 1.25.0 / `golang:1.25-alpine` |
-| HTTP framework | Gin | 1.12.0 |
-| ORM | GORM | 1.31.2 |
-| Driver PostgreSQL | `gorm.io/driver/postgres` | 1.6.2 |
-| Kafka Go client | franz-go | 1.21.6 |
-| UUID | `google/uuid` | 1.6.0 |
-| Library password/kriptografi | `golang.org/x/crypto` | 0.54.0 Auth Provider; 0.48.0 relying apps |
-| Environment loader | `godotenv` | 1.5.1 |
-| Bahasa frontend | TypeScript | 5.9.3 |
-| Framework frontend | Angular | 21.2.21 |
-| Build/CLI Angular | Angular CLI / Build | 21.2.21 |
-| Library reaktif | RxJS | 7.8.2 |
-| Runtime helper Angular | Zone.js / tslib | 0.16.2 / 2.8.1 |
-| Runtime build frontend | Node.js | `node:22-alpine` |
-| Package manager frontend | npm | 10.9.4 |
-| Static web server | NGINX | `nginx:1.27-alpine` |
-| Base image runtime | Alpine Linux | 3.22 |
-| Database | PostgreSQL | `postgres:16-alpine` |
-| Message broker | Apache Kafka (Confluent image) | 7.5.0 |
-| Coordination service | Apache ZooKeeper (Confluent image) | 7.5.0 |
-| Framework E2E | Playwright Test | 1.62.1 |
-| E2E environment loader | dotenv | 17.4.2 |
-| Orkestrasi container | Docker Compose | Compose Specification (`docker-compose.yml`) |
-
-Versi persis seluruh dependency transitif Go dan npm tercatat pada `go.sum` dan `package-lock.json` di setiap layanan.
+| Backend | Go, Gin, GORM | 1.25.0, 1.12.0, 1.31.2 |
+| Frontend | TypeScript, Angular | 5.9.3, 21.2.21 |
+| Database | PostgreSQL | 16 |
+| Message broker | Apache Kafka, ZooKeeper | 7.5.0 |
+| Web server | NGINX | 1.27 |
+| Container | Docker, Docker Compose | Compose Specification |
+| E2E testing | Playwright | 1.62.1 |
 
 ## Daftar Endpoint API
 
