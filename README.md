@@ -115,78 +115,39 @@ flowchart LR
 
 ### Alur Sign-in dan SSO
 
-1. Apex atau Bolt membuat PKCE verifier acak, challenge `S256`, dan nilai state OAuth.
-2. Relying application mengarahkan browser ke `GET /authorize` pada Auth Provider.
-3. Jika cookie SSO pusat belum tersedia, pengguna melakukan sign-in melalui UI pusat.
-4. Auth Provider memeriksa pengguna aktif, client terdaftar, kecocokan persis redirect URI, serta kebijakan grup terhadap aplikasi.
-5. Auth Provider membuat authorization code berumur pendek dan sekali pakai, lalu mengarahkan browser ke callback relying application.
-6. Relying application menukarkan code dan verifier melalui `POST /token` menggunakan client credential miliknya.
-7. Auth Provider memvalidasi PKCE dan menerbitkan opaque access token.
-8. Relying application memanggil `GET /userinfo`, menyimpan cache profil, membuat sesi lokal, dan memasang cookie lokal yang independen.
-9. Sesi pusat yang sama dapat digunakan untuk masuk ke relying application lainnya tanpa memasukkan credential kembali.
+1. Apex atau Bolt membuat PKCE verifier, challenge `S256`, dan state OAuth.
+2. Browser diarahkan ke `GET /authorize`. Pengguna login jika belum memiliki sesi SSO.
+3. Auth Provider memvalidasi pengguna, client, redirect URI, dan kebijakan akses.
+4. Auth Provider menerbitkan authorization code sekali pakai ke callback aplikasi.
+5. Aplikasi menukarkan code dan verifier melalui `POST /token`.
+6. Auth Provider memvalidasi PKCE lalu menerbitkan opaque token.
+7. Aplikasi mengambil `/userinfo` dan membuat sesi lokal.
+8. Sesi SSO yang sama dapat digunakan di aplikasi lain tanpa login ulang.
 
 ### Local Logout
 
-`POST /logout` pada Apex atau Bolt hanya mencabut sesi lokal aplikasi tersebut. Sesi SSO pusat dan sesi aplikasi lainnya tetap aktif.
+`POST /logout` hanya mencabut sesi lokal. Sesi SSO dan aplikasi lain tetap aktif.
 
 ### SSO Logout dan Pencabutan Asinkron
 
-1. `POST /logout` pada Auth Provider mencabut sesi pusat beserta token OAuth terkait.
-2. Pada transaksi database yang sama, event disimpan ke transactional outbox.
-3. Outbox publisher mengirim event ke topik Kafka `sso-session-events`.
-4. Sync Worker mengonsumsi event dan membuat catatan delivery untuk setiap aplikasi tujuan.
-5. Worker memanggil endpoint `POST /internal/logout` pada setiap aplikasi terdampak.
-6. Relying application mengautentikasi worker, mencabut sesi lokal terkait secara idempoten, dan mencatat aktivitas.
-7. Delivery yang gagal akan dicoba kembali; event yang melewati batas percobaan dikirim ke `sso-session-events-dlq`.
+1. Auth Provider mencabut sesi pusat dan token terkait.
+2. Event disimpan ke transactional outbox.
+3. Outbox mengirim event ke Kafka.
+4. Sync Worker memproses event dan delivery setiap aplikasi.
+5. Worker memanggil `POST /internal/logout` pada aplikasi terdampak.
+6. Aplikasi mencabut sesi lokal secara idempoten.
+7. Delivery gagal akan di-retry atau dikirim ke dead-letter topic.
 
-Perubahan password dan hilangnya otorisasi akibat perubahan grup, aplikasi, atau kebijakan menggunakan jalur pencabutan yang sama.
+Perubahan password dan akses memakai jalur pencabutan yang sama.
 
 ## Keputusan Teknis
 
-### Opaque Token Dibandingkan JWT
-
-- **Pilihan:** access token berupa nilai opaque acak; hash dan statusnya disimpan secara terpusat.
-- **Validasi:** relying application mengambil identitas melalui `/userinfo`.
-- **Kelebihan:** pencabutan berlaku langsung, token tidak membocorkan data, dan perubahan grup tidak meninggalkan claim lama.
-- **Konsekuensi:** validasi memerlukan lookup ke Auth Provider sehingga bergantung pada ketersediaan database.
-
-### Apache Kafka sebagai Message Broker
-
-- Membawa event `SessionRevoked`, `PasswordChanged`, dan `AccessPolicyChanged`.
-- Memisahkan transaksi Auth Provider dari ketersediaan Apex dan Bolt.
-- Mendukung consumer group, retry, delivery tracking, dan dead-letter topic.
-- Menggunakan transactional outbox agar perubahan data selalu memiliki event yang tahan lama.
-
-### Autentikasi Service-to-Service
-
-- Sync Worker memanggil `POST /internal/logout` dengan `Authorization: Bearer <INTERNAL_API_SECRET>`.
-- Apex dan Bolt memvalidasi shared secret dari environment variable.
-- Endpoint hanya ditujukan untuk jaringan internal Compose dan tidak menggunakan cookie browser.
-- Deployment produksi multi-host sebaiknya menambahkan TLS/mTLS atau workload identity.
-
-### Retensi Data dan Penghapusan
-
-- Pengguna, grup, keanggotaan, aplikasi, redirect URI, dan kebijakan menggunakan soft deletion (`deleted_at`).
-- Sesi dan token dipertahankan dengan status seperti `revoked` atau `expired`.
-- Audit log, event, delivery, cache profil, dan processed event dipertahankan sebagai riwayat operasional.
-- Strategi ini menjaga bukti keamanan, kemampuan retry, relasi historis, dan idempotensi.
-
-### Batas Kepemilikan Sesi
-
-- Auth Provider memiliki sesi SSO pusat.
-- Apex dan Bolt memiliki sesi lokal dan database masing-masing.
-- Local logout hanya menghapus sesi aplikasi terkait.
-- Pencabutan sesi pusat dipropagasikan secara asinkron melalui Kafka.
-
-### Mekanisme Keamanan
-
-- Authorization Code flow dengan PKCE `S256`.
-- Authorization code berumur pendek dan sekali pakai.
-- Redirect URI harus cocok secara persis.
-- Password, client secret, opaque token, dan identifier sesi disimpan dalam bentuk hash sesuai kebutuhan.
-- Cookie menggunakan HTTP-only dengan konfigurasi secure cookie.
-- Request ID, format error terstruktur, audit log, allow-list CORS, dan event idempoten.
-- Seluruh secret diberikan melalui environment variable.
+- **Opaque token, bukan JWT:** pencabutan dapat berlaku langsung dan token tidak membawa claim lama. Konsekuensinya, validasi harus melalui Auth Provider.
+- **Kafka, bukan RabbitMQ:** Kafka menyediakan event log yang tahan lama, replay, consumer group, dan urutan per partisi. Fitur ini cocok untuk pencabutan sesi yang perlu dilacak dan diproses ulang.
+- **Shared secret, bukan cookie pengguna:** `/internal/logout` dipanggil oleh Sync Worker, bukan browser. Bearer secret sederhana dan cukup untuk jaringan internal Compose.
+- **Soft-delete, bukan hard-delete:** data administratif tetap tersedia untuk audit dan relasi historis. Sesi serta token menggunakan status `revoked` atau `expired`.
+- **Sesi lokal terpisah:** local logout tidak menghapus sesi SSO atau sesi aplikasi lain. Pencabutan pusat dikirim secara asinkron.
+- **Authorization Code + PKCE:** authorization code sekali pakai dan challenge `S256` mencegah code yang dicuri digunakan tanpa verifier.
 
 ## Tech Stack dan Versi
 
