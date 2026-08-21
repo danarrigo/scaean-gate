@@ -32,6 +32,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to access database pool: %v", err)
 	}
+	defer sqlDB.Close()
 
 	disp := dispatcher.NewHTTPDispatcher(db, cfg.InternalAPISecret)
 
