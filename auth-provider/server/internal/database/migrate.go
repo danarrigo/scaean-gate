@@ -10,6 +10,13 @@ import (
 )
 
 func AutoMigrate(db *gorm.DB) error {
+	if err := db.SetupJoinTable(&models.User{}, "Groups", &models.UserGroup{}); err != nil {
+		return fmt.Errorf("configure user-group join table: %w", err)
+	}
+	if err := db.SetupJoinTable(&models.Group{}, "Users", &models.UserGroup{}); err != nil {
+		return fmt.Errorf("configure group-user join table: %w", err)
+	}
+
 	err := db.AutoMigrate(
 		&models.User{},
 		&models.Group{},

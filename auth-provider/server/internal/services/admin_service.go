@@ -136,7 +136,8 @@ func (s *AdminService) UpdateUser(id uuid.UUID, req dto.UpdateUserRequest) (*dto
 
 	user.Name = req.Name
 	user.Email = req.Email
-	if req.Password != "" {
+	passwordChanged := req.Password != ""
+	if passwordChanged {
 		hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return nil, err
@@ -144,7 +145,7 @@ func (s *AdminService) UpdateUser(id uuid.UUID, req dto.UpdateUserRequest) (*dto
 		user.PasswordHash = string(hash)
 	}
 
-	if err := s.UserRepo.UpdateUser(&user, req.GroupIDs); err != nil {
+	if err := s.UserRepo.UpdateUser(&user, req.GroupIDs, passwordChanged); err != nil {
 		return nil, err
 	}
 
@@ -260,11 +261,10 @@ func (s *AdminService) UpdateGroup(id uuid.UUID, req dto.UpdateGroupRequest) (*d
 }
 
 func (s *AdminService) DeleteGroup(id uuid.UUID) error {
-	var group models.Group
-	if err := s.GroupRepo.DB.Where("id = ?", id).First(&group).Error; err != nil {
+	if _, err := s.GroupRepo.GetGroupByID(id); err != nil {
 		return response.NewAppError(http.StatusNotFound, "NOT_FOUND", "Group not found")
 	}
-	return s.GroupRepo.DeleteGroup(id)
+	return s.GroupRepo.DeleteGroupWithEvents(id)
 }
 
 func (s *AdminService) AssignUserToGroup(groupID, userID uuid.UUID) error {
@@ -279,7 +279,7 @@ func (s *AdminService) AssignUserToGroup(groupID, userID uuid.UUID) error {
 }
 
 func (s *AdminService) UnassignUserFromGroup(groupID, userID uuid.UUID) error {
-	return s.GroupRepo.UnassignUser(groupID, userID)
+	return s.GroupRepo.UnassignUserWithEvents(groupID, userID)
 }
 
 func (s *AdminService) ListApps() ([]dto.AppResponse, error) {

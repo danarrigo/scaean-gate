@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -57,14 +59,47 @@ func (r *AppRepository) UpdateApp(app *models.Application) error {
 }
 
 func (r *AppRepository) DeleteApp(id uuid.UUID) error {
-	return r.DB.Delete(&models.Application{}, "id = ?", id).Error
+	return r.DB.Transaction(func(tx *gorm.DB) error {
+		var userIDs []uuid.UUID
+		if err := tx.Table("user_groups").
+			Distinct("user_groups.user_id").
+			Joins("JOIN application_group_policies ON application_group_policies.group_id = user_groups.group_id").
+			Where("application_group_policies.application_id = ? AND application_group_policies.deleted_at IS NULL AND user_groups.deleted_at IS NULL", id).
+			Pluck("user_groups.user_id", &userIDs).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.Application{}).Where("id = ?", id).Update("status", "inactive").Error; err != nil {
+			return err
+		}
+		if err := tx.Where("application_id = ?", id).Delete(&models.ApplicationRedirectURI{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("application_id = ?", id).Delete(&models.ApplicationGroupPolicy{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Delete(&models.Application{}, "id = ?", id).Error; err != nil {
+			return err
+		}
+		return enqueueLostAccessEvents(tx, userIDs, []uuid.UUID{id})
+	})
 }
 
 func (r *AppRepository) AddRedirectURI(appID uuid.UUID, uri string) (models.ApplicationRedirectURI, error) {
-	redirect := models.ApplicationRedirectURI{
-		ApplicationID: appID,
-		RedirectURI:   uri,
+	var redirect models.ApplicationRedirectURI
+	err := r.DB.Unscoped().Where("application_id = ? AND redirect_uri = ?", appID, uri).First(&redirect).Error
+	if err == nil {
+		if !redirect.DeletedAt.Valid {
+			return redirect, nil
+		}
+		if err := r.DB.Unscoped().Model(&redirect).Update("deleted_at", nil).Error; err != nil {
+			return models.ApplicationRedirectURI{}, err
+		}
+		return redirect, nil
 	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.ApplicationRedirectURI{}, err
+	}
+	redirect = models.ApplicationRedirectURI{ApplicationID: appID, RedirectURI: uri}
 	if err := r.DB.Create(&redirect).Error; err != nil {
 		return models.ApplicationRedirectURI{}, err
 	}

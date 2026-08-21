@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"errors"
+
 	"github.com/danarrigo/scaean-gate/auth-provider/server/internal/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -14,7 +16,7 @@ func (r *PolicyRepository) HasUserAccess(userID uuid.UUID, appID uuid.UUID) (boo
 	var count int64
 	err := r.DB.Table("application_group_policies").
 		Joins("JOIN user_groups ON user_groups.group_id = application_group_policies.group_id").
-		Where("user_groups.user_id = ? AND application_group_policies.application_id = ? AND application_group_policies.effect = 'allow'", userID, appID).
+		Where("user_groups.user_id = ? AND user_groups.deleted_at IS NULL AND application_group_policies.application_id = ? AND application_group_policies.effect = 'allow' AND application_group_policies.deleted_at IS NULL", userID, appID).
 		Count(&count).Error
 	if err != nil {
 		return false, err
@@ -39,6 +41,23 @@ func (r *PolicyRepository) GetPolicyByID(id uuid.UUID) (models.ApplicationGroupP
 }
 
 func (r *PolicyRepository) CreatePolicy(policy *models.ApplicationGroupPolicy) error {
+	var existing models.ApplicationGroupPolicy
+	err := r.DB.Unscoped().Where("application_id = ? AND group_id = ? AND effect = ?", policy.ApplicationID, policy.GroupID, policy.Effect).First(&existing).Error
+	if err == nil {
+		if !existing.DeletedAt.Valid {
+			*policy = existing
+			return nil
+		}
+		if err := r.DB.Unscoped().Model(&existing).Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+		*policy = existing
+		policy.DeletedAt = gorm.DeletedAt{}
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
 	return r.DB.Create(policy).Error
 }
 
@@ -51,7 +70,7 @@ func (r *PolicyRepository) DeletePolicyWithEvents(id, applicationID, groupID uui
 		var userIDs []uuid.UUID
 		err := tx.Table("user_groups AS affected").
 			Distinct("affected.user_id").
-			Where("affected.group_id = ?", groupID).
+			Where("affected.group_id = ? AND affected.deleted_at IS NULL", groupID).
 			Where(`NOT EXISTS (
 				SELECT 1
 				FROM user_groups remaining_groups
@@ -59,7 +78,9 @@ func (r *PolicyRepository) DeletePolicyWithEvents(id, applicationID, groupID uui
 				  ON remaining_policies.group_id = remaining_groups.group_id
 				WHERE remaining_groups.user_id = affected.user_id
 				  AND remaining_policies.application_id = ?
+				  AND remaining_groups.deleted_at IS NULL
 				  AND remaining_policies.effect = 'allow'
+				  AND remaining_policies.deleted_at IS NULL
 			)`, applicationID).
 			Pluck("affected.user_id", &userIDs).Error
 		if err != nil {

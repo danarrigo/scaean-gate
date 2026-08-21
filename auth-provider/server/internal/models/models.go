@@ -22,55 +22,60 @@ type User struct {
 }
 
 type Group struct {
-	ID          uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	Name        string    `gorm:"type:varchar(255);not null;uniqueIndex"`
-	Description string    `gorm:"type:text"`
-	CreatedAt   time.Time `gorm:"not null"`
-	UpdatedAt   time.Time `gorm:"not null"`
+	ID          uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	Name        string         `gorm:"type:varchar(255);not null;uniqueIndex"`
+	Description string         `gorm:"type:text"`
+	CreatedAt   time.Time      `gorm:"not null"`
+	UpdatedAt   time.Time      `gorm:"not null"`
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
 
 	Users []User `gorm:"many2many:user_groups;"`
 }
 
 type UserGroup struct {
-	ID        uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	UserID    uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_user_group"`
-	GroupID   uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_user_group"`
-	CreatedAt time.Time `gorm:"not null"`
+	ID        uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	UserID    uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:idx_user_group"`
+	GroupID   uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:idx_user_group"`
+	CreatedAt time.Time      `gorm:"not null"`
+	DeletedAt gorm.DeletedAt `gorm:"index"`
 
 	User  User  `gorm:"foreignKey:UserID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Group Group `gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 type Application struct {
-	ID                    uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	Name                  string    `gorm:"type:varchar(255);not null"`
-	ClientID              string    `gorm:"type:varchar(255);uniqueIndex;not null"`
-	ClientSecretHash      string    `gorm:"type:varchar(255)"`
-	ClientSecretPrefix    string    `gorm:"type:varchar(32)"`
-	Status                string    `gorm:"type:varchar(50);not null;default:'active'"`
-	LaunchURL             string    `gorm:"type:text"`
-	LogoutNotificationURL string    `gorm:"type:text;not null"`
-	CreatedAt             time.Time `gorm:"not null"`
-	UpdatedAt             time.Time `gorm:"not null"`
+	ID                    uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	Name                  string         `gorm:"type:varchar(255);not null"`
+	ClientID              string         `gorm:"type:varchar(255);uniqueIndex;not null"`
+	ClientSecretHash      string         `gorm:"type:varchar(255)"`
+	ClientSecretPrefix    string         `gorm:"type:varchar(32)"`
+	Status                string         `gorm:"type:varchar(50);not null;default:'active'"`
+	LaunchURL             string         `gorm:"type:text"`
+	LogoutNotificationURL string         `gorm:"type:text;not null"`
+	CreatedAt             time.Time      `gorm:"not null"`
+	UpdatedAt             time.Time      `gorm:"not null"`
+	DeletedAt             gorm.DeletedAt `gorm:"index"`
 
 	RedirectURIs []ApplicationRedirectURI `gorm:"foreignKey:ApplicationID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
 
 type ApplicationRedirectURI struct {
-	ID            uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	ApplicationID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_app_redirect"`
-	RedirectURI   string    `gorm:"type:text;not null;uniqueIndex:idx_app_redirect"`
-	CreatedAt     time.Time `gorm:"not null"`
+	ID            uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	ApplicationID uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:idx_app_redirect"`
+	RedirectURI   string         `gorm:"type:text;not null;uniqueIndex:idx_app_redirect"`
+	CreatedAt     time.Time      `gorm:"not null"`
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
 
 	Application Application `gorm:"foreignKey:ApplicationID"`
 }
 
 type ApplicationGroupPolicy struct {
-	ID            uuid.UUID `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	ApplicationID uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_app_group_effect"`
-	GroupID       uuid.UUID `gorm:"type:uuid;not null;uniqueIndex:idx_app_group_effect"`
-	Effect        string    `gorm:"type:varchar(50);not null;default:'allow';uniqueIndex:idx_app_group_effect"`
-	CreatedAt     time.Time `gorm:"not null"`
+	ID            uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	ApplicationID uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:idx_app_group_effect"`
+	GroupID       uuid.UUID      `gorm:"type:uuid;not null;uniqueIndex:idx_app_group_effect"`
+	Effect        string         `gorm:"type:varchar(50);not null;default:'allow';uniqueIndex:idx_app_group_effect"`
+	CreatedAt     time.Time      `gorm:"not null"`
+	DeletedAt     gorm.DeletedAt `gorm:"index"`
 
 	Application Application `gorm:"foreignKey:ApplicationID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Group       Group       `gorm:"foreignKey:GroupID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`

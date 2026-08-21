@@ -20,11 +20,11 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 		Description: "Group for Users",
 	}
 
-	err := db.FirstOrCreate(&adminGroup, models.Group{Name: adminGroup.Name}).Error
+	err := db.Unscoped().Where("name = ?", adminGroup.Name).FirstOrCreate(&adminGroup).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
-	err = db.FirstOrCreate(&userGroup, models.Group{Name: userGroup.Name}).Error
+	err = db.Unscoped().Where("name = ?", userGroup.Name).FirstOrCreate(&userGroup).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
@@ -48,12 +48,12 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 		Status:       "active",
 	}
 
-	err = db.FirstOrCreate(&adminUser, models.User{Email: adminUser.Email}).Error
+	err = db.Unscoped().Where("email = ?", adminUser.Email).FirstOrCreate(&adminUser).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
 
-	err = db.FirstOrCreate(&testUser, models.User{Email: testUser.Email}).Error
+	err = db.Unscoped().Where("email = ?", testUser.Email).FirstOrCreate(&testUser).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
@@ -68,18 +68,12 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 		GroupID: userGroup.ID,
 	}
 
-	err = db.FirstOrCreate(&adminUG, models.UserGroup{
-		UserID:  adminUG.UserID,
-		GroupID: adminUG.GroupID,
-	}).Error
+	err = db.Unscoped().Where("user_id = ? AND group_id = ?", adminUG.UserID, adminUG.GroupID).FirstOrCreate(&adminUG).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
 
-	err = db.FirstOrCreate(&testUG, models.UserGroup{
-		UserID:  testUG.UserID,
-		GroupID: testUG.GroupID,
-	}).Error
+	err = db.Unscoped().Where("user_id = ? AND group_id = ?", testUG.UserID, testUG.GroupID).FirstOrCreate(&testUG).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
@@ -104,15 +98,15 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 		LogoutNotificationURL: appBLogoutURL,
 	}
 
-	err = db.Where(models.Application{ClientID: appA.ClientID}).
-		Assign(models.Application{ClientSecretHash: appA.ClientSecretHash, ClientSecretPrefix: appA.ClientSecretPrefix, LogoutNotificationURL: appA.LogoutNotificationURL}).
+	err = db.Unscoped().Where("client_id = ?", appA.ClientID).
+		Assign(map[string]any{"client_secret_hash": appA.ClientSecretHash, "client_secret_prefix": appA.ClientSecretPrefix, "logout_notification_url": appA.LogoutNotificationURL}).
 		FirstOrCreate(&appA).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
 
-	err = db.Where(models.Application{ClientID: appB.ClientID}).
-		Assign(models.Application{ClientSecretHash: appB.ClientSecretHash, ClientSecretPrefix: appB.ClientSecretPrefix, LogoutNotificationURL: appB.LogoutNotificationURL}).
+	err = db.Unscoped().Where("client_id = ?", appB.ClientID).
+		Assign(map[string]any{"client_secret_hash": appB.ClientSecretHash, "client_secret_prefix": appB.ClientSecretPrefix, "logout_notification_url": appB.LogoutNotificationURL}).
 		FirstOrCreate(&appB).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
@@ -126,10 +120,7 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 	}
 
 	for _, u := range uris {
-		err = db.FirstOrCreate(&u, models.ApplicationRedirectURI{
-			ApplicationID: u.ApplicationID,
-			RedirectURI:   u.RedirectURI,
-		}).Error
+		err = db.Unscoped().Where("application_id = ? AND redirect_uri = ?", u.ApplicationID, u.RedirectURI).FirstOrCreate(&u).Error
 		if err != nil {
 			return fmt.Errorf("error: %w", err)
 		}
@@ -147,20 +138,12 @@ func Seed(db *gorm.DB, seedPassword, appAClientSecret, appBClientSecret, appALog
 		Effect:        "allow",
 	}
 
-	err = db.FirstOrCreate(&appAPolicy, models.ApplicationGroupPolicy{
-		ApplicationID: appAPolicy.ApplicationID,
-		GroupID:       appAPolicy.GroupID,
-		Effect:        "allow",
-	}).Error
+	err = db.Unscoped().Where("application_id = ? AND group_id = ? AND effect = 'allow'", appAPolicy.ApplicationID, appAPolicy.GroupID).FirstOrCreate(&appAPolicy).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
 
-	err = db.FirstOrCreate(&appBPolicy, models.ApplicationGroupPolicy{
-		ApplicationID: appBPolicy.ApplicationID,
-		GroupID:       appBPolicy.GroupID,
-		Effect:        "allow",
-	}).Error
+	err = db.Unscoped().Where("application_id = ? AND group_id = ? AND effect = 'allow'", appBPolicy.ApplicationID, appBPolicy.GroupID).FirstOrCreate(&appBPolicy).Error
 	if err != nil {
 		return fmt.Errorf("error: %w", err)
 	}
