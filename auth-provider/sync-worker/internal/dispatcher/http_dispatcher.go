@@ -1,4 +1,4 @@
-//Package dispatcher contains logic so the sync-worker can send notification to the apps that use the SSO
+// Package dispatcher contains logic so the sync-worker can send notification to the apps that use the SSO
 package dispatcher
 
 import (
@@ -97,7 +97,7 @@ func (d *HTTPDispatcher) DispatchToApp(parentCtx context.Context, event models.E
 
 	payload, err := json.Marshal(bodyPayload)
 	if err != nil {
-		d.markDeliveryAsFailed(delivery.ID)
+		_ = d.markDeliveryAsFailed(delivery.ID)
 		return
 	}
 
@@ -111,7 +111,7 @@ func (d *HTTPDispatcher) DispatchToApp(parentCtx context.Context, event models.E
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, app.LogoutNotificationURL, bytes.NewBuffer(payload))
 		if err != nil {
 			cancel()
-			d.markDeliveryAsFailed(delivery.ID)
+			_ = d.markDeliveryAsFailed(delivery.ID)
 			return
 		}
 
@@ -122,7 +122,7 @@ func (d *HTTPDispatcher) DispatchToApp(parentCtx context.Context, event models.E
 		cancel()
 
 		if err == nil && res != nil && res.StatusCode >= 200 && res.StatusCode < 300 {
-			res.Body.Close()
+			_ = res.Body.Close()
 			delivery.Status = "succeeded"
 			processedAt := time.Now()
 			delivery.ProcessedAt = &processedAt
@@ -131,10 +131,10 @@ func (d *HTTPDispatcher) DispatchToApp(parentCtx context.Context, event models.E
 		}
 
 		if res != nil && res.Body != nil {
-			res.Body.Close()
+			_ = res.Body.Close()
 		}
 
-		d.handleDeliveryError(delivery.ID)
+		_ = d.handleDeliveryError(delivery.ID)
 
 		if attempt < d.MaxRetries {
 			interval := math.Pow(2, float64(attempt)) * 2
