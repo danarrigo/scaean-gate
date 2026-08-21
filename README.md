@@ -1,110 +1,110 @@
 # Scaean Gate
 
-Centralized Identity and Authorization Provider with OAuth 2.0 Authorization Code + PKCE, group-based application access, independent relying-application sessions, and Kafka-backed session revocation.
+Penyedia Identitas dan Otorisasi terpusat dengan OAuth 2.0 Authorization Code + PKCE, akses aplikasi berbasis grup, sesi independen pada setiap relying application, serta pencabutan sesi berbasis Kafka.
 
-## Identity
+## Identitas
 
-| Field | Value |
+| Data | Nilai |
 | --- | --- |
-| Name | Daniel Arrigo Manurung |
+| Nama | Daniel Arrigo Manurung |
 | NIM | 18224031 |
 
-## System execution guide
+## Panduan Menjalankan Sistem
 
-### Prerequisites
+### Prasyarat
 
-- Docker Engine with Docker Compose
-- At least 4 GB of free memory for PostgreSQL, Kafka, the Go services, and the three frontends
-- Node.js/npm are only required when running Playwright outside Docker
+- Docker Engine dengan Docker Compose
+- Memori kosong minimal 4 GB untuk PostgreSQL, Kafka, layanan Go, dan tiga frontend
+- Node.js/npm hanya diperlukan jika Playwright dijalankan di luar Docker
 
-### Configuration
+### Konfigurasi
 
-Create the local environment file:
+Buat berkas environment lokal:
 
 ```bash
 cp .env.example .env
 ```
 
-Fill every blank value in `.env` with a strong, unique secret:
+Isi seluruh nilai kosong di `.env` dengan secret yang kuat dan unik:
 
 ```dotenv
 DB_USER=sso_user
-DB_PASSWORD=<strong-database-password>
-SEED_USER_PASSWORD=<initial-password-for-both-seeded-users>
-APP_A_CLIENT_SECRET=<strong-app-a-secret>
-APP_B_CLIENT_SECRET=<strong-app-b-secret>
-INTERNAL_API_SECRET=<strong-worker-to-app-secret>
+DB_PASSWORD=<password-database-yang-kuat>
+SEED_USER_PASSWORD=<password-awal-untuk-kedua-pengguna-seed>
+APP_A_CLIENT_SECRET=<secret-app-a-yang-kuat>
+APP_B_CLIENT_SECRET=<secret-app-b-yang-kuat>
+INTERNAL_API_SECRET=<secret-worker-ke-aplikasi-yang-kuat>
 COOKIE_SECURE=false
 ```
 
-`.env` is ignored by Git and must not be committed. `COOKIE_SECURE=false` is required for local HTTP. Set it to `true` behind HTTPS.
+`.env` diabaikan oleh Git dan tidak boleh di-commit. `COOKIE_SECURE=false` diperlukan untuk HTTP lokal. Ubah menjadi `true` apabila sistem dijalankan di balik HTTPS.
 
-### Start the system
+### Menjalankan Sistem
 
-From the repository root:
+Jalankan dari root repositori:
 
 ```bash
 docker compose up --build
 ```
 
-To start in the background and wait for health checks:
+Untuk menjalankan di background dan menunggu seluruh health check:
 
 ```bash
 docker compose up -d --build --wait
 docker compose ps
 ```
 
-### Database creation, migrations, and seeders
+### Pembuatan Database, Migrasi, dan Seeder
 
-No separate migration command is required:
+Tidak diperlukan perintah migrasi terpisah:
 
-1. On the first PostgreSQL startup, `scripts/init-databases.sh` creates `sso_db`, `app_a_db`, and `app_b_db`.
-2. The Auth Provider runs GORM `AutoMigrate` for central identity, OAuth, policy, audit, event, and delivery tables at startup.
-3. App A and App B run `AutoMigrate` for their local session, profile cache, processed-event, and activity tables at startup.
-4. The Auth Provider then runs an idempotent seeder at startup.
+1. Saat PostgreSQL pertama kali dijalankan, `scripts/init-databases.sh` membuat `sso_db`, `app_a_db`, dan `app_b_db`.
+2. Auth Provider menjalankan GORM `AutoMigrate` untuk tabel identitas pusat, OAuth, kebijakan akses, audit, event, dan delivery ketika startup.
+3. App A dan App B menjalankan `AutoMigrate` untuk tabel sesi lokal, cache profil, event yang telah diproses, dan aktivitas ketika startup.
+4. Auth Provider kemudian menjalankan seeder yang idempoten ketika startup.
 
-The seeder creates:
+Seeder membuat data berikut:
 
-- `admin@scaean-gate.com` in the **Admin** group
-- `testuser@scaean-gate.com` in the **User** group
-- Apex and Bolt OAuth clients, redirect URIs, and User-group allow policies
+- `admin@scaean-gate.com` di dalam grup **Admin**
+- `testuser@scaean-gate.com` di dalam grup **User**
+- OAuth client Apex dan Bolt, redirect URI, serta kebijakan `allow` untuk grup User
 
-Both users initially use `SEED_USER_PASSWORD` from `.env`.
+Kedua pengguna pada awalnya menggunakan nilai `SEED_USER_PASSWORD` dari `.env`.
 
-To recreate all databases and rerun initialization from a clean state:
+Untuk membuat ulang seluruh database dan menjalankan inisialisasi dari kondisi bersih:
 
 ```bash
 docker compose down -v
 docker compose up -d --build --wait
 ```
 
-> Removing the volume permanently deletes local data.
+> Penghapusan volume akan menghapus seluruh data lokal secara permanen.
 
-### Access URLs
+### URL Akses
 
-| Component | URL | Purpose |
+| Komponen | URL | Kegunaan |
 | --- | --- | --- |
-| Admin Control Panel | <http://localhost:4200> | Central profile and administrative management |
-| Apex (App A) | <http://localhost:4201> | First independent relying application |
-| Bolt (App B) | <http://localhost:4202> | Second independent relying application |
-| Auth Provider API | <http://localhost:8080> | Authentication, OAuth, policy, and admin API |
-| App A API | <http://localhost:8081> | Apex OAuth callback and local session API |
-| App B API | <http://localhost:8082> | Bolt OAuth callback and local session API |
-| PostgreSQL | `localhost:5432` | Host database access |
-| Kafka | `localhost:9092` | Host broker access |
-| Sync Worker probe | Internal port `8083` | Container-only worker health API |
+| Admin Control Panel | <http://localhost:4200> | Profil pusat dan pengelolaan administratif |
+| Apex (App A) | <http://localhost:4201> | Relying application independen pertama |
+| Bolt (App B) | <http://localhost:4202> | Relying application independen kedua |
+| Auth Provider API | <http://localhost:8080> | API autentikasi, OAuth, kebijakan, dan administrasi |
+| App A API | <http://localhost:8081> | Callback OAuth Apex dan API sesi lokal |
+| App B API | <http://localhost:8082> | Callback OAuth Bolt dan API sesi lokal |
+| PostgreSQL | `localhost:5432` | Akses database dari host |
+| Kafka | `localhost:9092` | Akses message broker dari host |
+| Probe Sync Worker | Port internal `8083` | API health khusus jaringan container |
 
-### Stop the system
+### Menghentikan Sistem
 
 ```bash
 docker compose down
 ```
 
-Use `docker compose down -v` only when the database volume should also be removed.
+Gunakan `docker compose down -v` hanya jika volume database juga ingin dihapus.
 
-### Tests
+### Pengujian
 
-Run backend tests:
+Jalankan pengujian backend:
 
 ```bash
 (cd auth-provider/server && go test ./...)
@@ -113,7 +113,7 @@ Run backend tests:
 (cd applications/app-b && go test ./...)
 ```
 
-Run the two critical Playwright flows in an isolated Compose project:
+Jalankan dua alur kritis Playwright pada proyek Compose yang terisolasi:
 
 ```bash
 cd e2e
@@ -122,9 +122,9 @@ npm run install:browsers
 npm run test:docker
 ```
 
-The E2E runner temporarily stops a running default Compose project, creates a clean isolated stack, tests Authorization Code + PKCE with local/SSO logout, removes the test stack and volume, and restarts the default project when necessary.
+E2E runner akan menghentikan proyek Compose utama untuk sementara, membuat stack pengujian yang bersih dan terisolasi, menguji Authorization Code + PKCE beserta local logout dan SSO logout, menghapus stack serta volume pengujian, kemudian menjalankan kembali proyek utama apabila sebelumnya aktif.
 
-## Architecture and request flows
+## Arsitektur dan Alur Request
 
 ```mermaid
 flowchart LR
@@ -153,214 +153,214 @@ flowchart LR
     Worker -->|Bearer shared secret\n/internal/logout| Bolt
 ```
 
-### Sign-in and SSO flow
+### Alur Sign-in dan SSO
 
-1. Apex or Bolt generates a random PKCE verifier, its `S256` challenge, and an OAuth state value.
-2. The relying app redirects the browser to `GET /authorize` at the Auth Provider.
-3. If no central SSO cookie exists, the user signs in through the central UI.
-4. The Auth Provider checks the active user, registered client, exact redirect URI, and group/application policy.
-5. It creates a short-lived, single-use authorization code and redirects to the relying app callback.
-6. The relying app exchanges the code and verifier at `POST /token` using its client credentials.
-7. The Auth Provider validates PKCE and issues an opaque access token.
-8. The relying app calls `GET /userinfo`, caches the profile, creates its own local session, and sets an independent local cookie.
-9. A central session can therefore sign the browser into the other relying app without entering credentials again.
+1. Apex atau Bolt membuat PKCE verifier acak, challenge `S256`, dan nilai state OAuth.
+2. Relying application mengarahkan browser ke `GET /authorize` pada Auth Provider.
+3. Jika cookie SSO pusat belum tersedia, pengguna melakukan sign-in melalui UI pusat.
+4. Auth Provider memeriksa pengguna aktif, client terdaftar, kecocokan persis redirect URI, serta kebijakan grup terhadap aplikasi.
+5. Auth Provider membuat authorization code berumur pendek dan sekali pakai, lalu mengarahkan browser ke callback relying application.
+6. Relying application menukarkan code dan verifier melalui `POST /token` menggunakan client credential miliknya.
+7. Auth Provider memvalidasi PKCE dan menerbitkan opaque access token.
+8. Relying application memanggil `GET /userinfo`, menyimpan cache profil, membuat sesi lokal, dan memasang cookie lokal yang independen.
+9. Sesi pusat yang sama dapat digunakan untuk masuk ke relying application lainnya tanpa memasukkan credential kembali.
 
-### Local logout
+### Local Logout
 
-`POST /logout` on Apex or Bolt revokes only that application's local session. The central SSO session and the other application's session remain active.
+`POST /logout` pada Apex atau Bolt hanya mencabut sesi lokal aplikasi tersebut. Sesi SSO pusat dan sesi aplikasi lainnya tetap aktif.
 
-### SSO logout and asynchronous revocation
+### SSO Logout dan Pencabutan Asinkron
 
-1. `POST /logout` at the Auth Provider revokes the central session and associated OAuth tokens.
-2. In the same database transaction, an event is persisted to the transactional outbox.
-3. The outbox publisher sends the event to `sso-session-events` in Kafka.
-4. The Sync Worker consumes the event and creates per-application delivery records.
-5. It calls each affected application's `POST /internal/logout` endpoint.
-6. The relying app authenticates the worker, idempotently revokes matching local sessions, and records activity.
-7. Failed deliveries are retried; exhausted events are sent to `sso-session-events-dlq`.
+1. `POST /logout` pada Auth Provider mencabut sesi pusat beserta token OAuth terkait.
+2. Pada transaksi database yang sama, event disimpan ke transactional outbox.
+3. Outbox publisher mengirim event ke topik Kafka `sso-session-events`.
+4. Sync Worker mengonsumsi event dan membuat catatan delivery untuk setiap aplikasi tujuan.
+5. Worker memanggil endpoint `POST /internal/logout` pada setiap aplikasi terdampak.
+6. Relying application mengautentikasi worker, mencabut sesi lokal terkait secara idempoten, dan mencatat aktivitas.
+7. Delivery yang gagal akan dicoba kembali; event yang melewati batas percobaan dikirim ke `sso-session-events-dlq`.
 
-Password changes and authorization loss from group, application, or policy changes use the same revocation path.
+Perubahan password dan hilangnya otorisasi akibat perubahan grup, aplikasi, atau kebijakan menggunakan jalur pencabutan yang sama.
 
-## Technical decisions
+## Keputusan Teknis
 
-### Opaque tokens instead of JWTs
+### Opaque Token Dibandingkan JWT
 
-Access tokens are cryptographically random opaque values whose hashes/state are stored centrally. Resource applications resolve identity through `/userinfo` rather than trusting self-contained claims.
+Access token berupa nilai opaque acak yang aman secara kriptografis. Hash dan status token disimpan secara terpusat. Resource application mengambil identitas melalui `/userinfo`, bukan mempercayai claim mandiri di dalam token.
 
-Consequences:
+Konsekuensi pemilihan opaque token:
 
-- Revocation and expiry take effect immediately at the Auth Provider.
-- Group and account changes do not leave stale authorization claims inside a signed token.
-- Tokens reveal no user or authorization data to clients.
-- Validation requires an Auth Provider lookup, unlike offline JWT verification, so database availability and latency matter.
+- Pencabutan dan kedaluwarsa berlaku langsung di Auth Provider.
+- Perubahan grup atau akun tidak meninggalkan claim otorisasi lama di dalam token yang sudah ditandatangani.
+- Token tidak mengungkapkan data pengguna atau otorisasi kepada client.
+- Validasi memerlukan lookup ke Auth Provider, tidak seperti verifikasi JWT secara offline, sehingga ketersediaan dan latensi database perlu diperhatikan.
 
-### Apache Kafka message broker
+### Apache Kafka sebagai Message Broker
 
-Kafka 7.5.0 carries `SessionRevoked`, `PasswordChanged`, and `AccessPolicyChanged` events. It decouples central identity transactions from relying-app availability, supports ordered consumption within the configured partition, consumer-group processing, retries, delivery observability, and a dead-letter topic. A transactional database outbox prevents identity changes from being committed without a durable event record.
+Kafka 7.5.0 membawa event `SessionRevoked`, `PasswordChanged`, dan `AccessPolicyChanged`. Kafka memisahkan transaksi identitas pusat dari ketersediaan relying application, mendukung pemrosesan berurutan dalam partisi yang dikonfigurasi, consumer group, retry, observabilitas delivery, serta dead-letter topic. Transactional database outbox mencegah perubahan identitas tersimpan tanpa catatan event yang tahan lama.
 
-### Service-to-service authentication
+### Autentikasi Service-to-Service
 
-The Sync Worker calls `POST /internal/logout` using:
+Sync Worker memanggil `POST /internal/logout` menggunakan:
 
 ```http
 Authorization: Bearer <INTERNAL_API_SECRET>
 ```
 
-App A and App B compare the supplied value against the environment-provided shared secret. This endpoint is not authenticated by browser cookies and is intended only for the trusted internal Compose network. In a multi-host production deployment, TLS/mTLS or a managed workload identity should be added.
+App A dan App B membandingkan nilai yang diterima dengan shared secret dari environment. Endpoint ini tidak menggunakan autentikasi cookie browser dan hanya ditujukan untuk jaringan internal Compose yang dipercaya. Pada deployment produksi multi-host, TLS/mTLS atau managed workload identity sebaiknya ditambahkan.
 
-### Data retention and deletion
+### Retensi Data dan Penghapusan
 
-Administrative resources use soft deletion (`deleted_at`) so normal queries exclude deleted records while auditability and historical relationships remain available. This applies to users, groups, user-group memberships, applications, redirect URIs, and access policies.
+Resource yang dikelola administrator menggunakan soft deletion (`deleted_at`). Query normal tidak menampilkan data terhapus, tetapi riwayat audit dan relasi historis tetap tersedia. Strategi ini diterapkan pada pengguna, grup, keanggotaan pengguna-grup, aplikasi, redirect URI, dan kebijakan akses.
 
-Sessions and tokens are retained with lifecycle statuses such as revoked or expired. Audit logs, outbox events, delivery attempts, local activity, profile caches, and processed-event records are historical/operational records rather than administratively deleted resources. This preserves security evidence, retry state, and idempotency.
+Sesi dan token dipertahankan dengan status siklus hidup seperti `revoked` atau `expired`. Audit log, outbox event, percobaan delivery, aktivitas lokal, cache profil, dan catatan event yang telah diproses merupakan data historis/operasional, bukan resource yang dihapus oleh administrator. Strategi ini mempertahankan bukti keamanan, status retry, dan idempotensi.
 
-### Session boundaries
+### Batas Kepemilikan Sesi
 
-The Auth Provider owns the central SSO session. Apex and Bolt each own a separate local session and database. Local logout does not mutate central state; central revocation propagates asynchronously to local state.
+Auth Provider memiliki sesi SSO pusat. Apex dan Bolt masing-masing memiliki sesi lokal serta database yang terpisah. Local logout tidak mengubah state pusat, sedangkan pencabutan pusat dipropagasikan secara asinkron menuju state lokal.
 
-### Security measures
+### Mekanisme Keamanan
 
-- Authorization Code flow with PKCE `S256`
-- Short-lived, single-use authorization codes
-- Exact redirect URI matching
-- Hashed passwords and client secrets
-- Hashed opaque tokens/session identifiers where applicable
-- HTTP-only cookies and configurable secure-cookie enforcement
-- Request IDs, structured error responses, audit logs, CORS allow-listing, and idempotent event handling
-- Secrets supplied only through environment variables
+- Authorization Code flow dengan PKCE `S256`
+- Authorization code berumur pendek dan sekali pakai
+- Pencocokan redirect URI secara persis
+- Password dan client secret yang di-hash
+- Opaque token dan identifier sesi yang di-hash sesuai kebutuhan
+- Cookie HTTP-only dan konfigurasi kewajiban secure cookie
+- Request ID, format error terstruktur, audit log, allow-list CORS, dan pemrosesan event idempoten
+- Secret hanya diberikan melalui environment variable
 
-## Technology stack and versions
+## Tech Stack dan Versi
 
-Versions below are the pinned container versions or resolved direct dependency versions in the committed lock/module files.
+Versi berikut merupakan versi image yang dikunci atau versi dependency langsung yang telah di-resolve pada lock file/module file yang di-commit.
 
-| Category | Technology | Version |
+| Kategori | Teknologi | Versi |
 | --- | --- | --- |
-| Backend language/build image | Go | 1.25.0 / `golang:1.25-alpine` |
+| Bahasa/build image backend | Go | 1.25.0 / `golang:1.25-alpine` |
 | HTTP framework | Gin | 1.12.0 |
 | ORM | GORM | 1.31.2 |
-| PostgreSQL driver | `gorm.io/driver/postgres` | 1.6.2 |
+| Driver PostgreSQL | `gorm.io/driver/postgres` | 1.6.2 |
 | Kafka Go client | franz-go | 1.21.6 |
 | UUID | `google/uuid` | 1.6.0 |
-| Password/crypto library | `golang.org/x/crypto` | 0.54.0 Auth Provider; 0.48.0 relying apps |
+| Library password/kriptografi | `golang.org/x/crypto` | 0.54.0 Auth Provider; 0.48.0 relying apps |
 | Environment loader | `godotenv` | 1.5.1 |
-| Frontend language | TypeScript | 5.9.3 |
-| Frontend framework | Angular | 21.2.21 |
-| Angular CLI/build | Angular CLI / Build | 21.2.21 |
-| Reactive library | RxJS | 7.8.2 |
-| Angular runtime helpers | Zone.js / tslib | 0.16.2 / 2.8.1 |
-| Frontend build runtime | Node.js | `node:22-alpine` |
-| Frontend package manager | npm | 10.9.4 |
+| Bahasa frontend | TypeScript | 5.9.3 |
+| Framework frontend | Angular | 21.2.21 |
+| Build/CLI Angular | Angular CLI / Build | 21.2.21 |
+| Library reaktif | RxJS | 7.8.2 |
+| Runtime helper Angular | Zone.js / tslib | 0.16.2 / 2.8.1 |
+| Runtime build frontend | Node.js | `node:22-alpine` |
+| Package manager frontend | npm | 10.9.4 |
 | Static web server | NGINX | `nginx:1.27-alpine` |
-| Runtime base image | Alpine Linux | 3.22 |
+| Base image runtime | Alpine Linux | 3.22 |
 | Database | PostgreSQL | `postgres:16-alpine` |
 | Message broker | Apache Kafka (Confluent image) | 7.5.0 |
 | Coordination service | Apache ZooKeeper (Confluent image) | 7.5.0 |
-| E2E framework | Playwright Test | 1.62.1 |
+| Framework E2E | Playwright Test | 1.62.1 |
 | E2E environment loader | dotenv | 17.4.2 |
-| Container orchestration | Docker Compose | Compose Specification (`docker-compose.yml`) |
+| Orkestrasi container | Docker Compose | Compose Specification (`docker-compose.yml`) |
 
-Exact transitive Go and npm dependencies are recorded in each service's `go.sum` and `package-lock.json`.
+Versi persis seluruh dependency transitif Go dan npm tercatat pada `go.sum` dan `package-lock.json` di setiap layanan.
 
-## API endpoints
+## Daftar Endpoint API
 
 ### Auth Provider — `http://localhost:8080`
 
-| Method | Path | Authentication | Purpose |
+| Method | Path | Autentikasi | Kegunaan |
 | --- | --- | --- | --- |
-| GET | `/health` | Public | Compatibility readiness check |
-| GET | `/health/live` | Public | Process liveness |
-| GET | `/health/ready` | Public | PostgreSQL and Kafka readiness |
-| POST | `/login` | Public | Authenticate and create central SSO session |
-| POST | `/logout` | Central session | Revoke the central SSO session |
-| POST | `/change-password` | Central session | Change password and revoke affected access |
-| GET | `/profile` | Central session | Return the current central profile |
-| GET | `/authorize` | Central session/OAuth parameters | Begin or resume authorization code flow |
-| POST | `/token` | OAuth client credentials | Exchange code + PKCE verifier for opaque token |
-| GET | `/userinfo` | Opaque bearer token | Return token owner's identity/profile |
-| GET | `/admin/users` | Admin central session | List users |
-| POST | `/admin/users` | Admin central session | Create user |
-| GET | `/admin/users/:id` | Admin central session | Get user |
-| PUT | `/admin/users/:id` | Admin central session | Update user |
-| DELETE | `/admin/users/:id` | Admin central session | Soft-delete user |
-| PATCH | `/admin/users/:id/status` | Admin central session | Activate/deactivate user |
-| GET | `/admin/groups` | Admin central session | List groups |
-| POST | `/admin/groups` | Admin central session | Create group |
-| GET | `/admin/groups/:id` | Admin central session | Get group and members |
-| PUT | `/admin/groups/:id` | Admin central session | Update group |
-| DELETE | `/admin/groups/:id` | Admin central session | Soft-delete group |
-| POST | `/admin/groups/:id/users` | Admin central session | Assign user to group |
-| DELETE | `/admin/groups/:id/users/:user_id` | Admin central session | Remove user from group |
-| GET | `/admin/apps` | Admin central session | List applications |
-| POST | `/admin/apps` | Admin central session | Register application and issue secret once |
-| GET | `/admin/apps/:id` | Admin central session | Get application |
-| PUT | `/admin/apps/:id` | Admin central session | Update application |
-| DELETE | `/admin/apps/:id` | Admin central session | Soft-delete application |
-| POST | `/admin/apps/:id/redirect-uris` | Admin central session | Add exact redirect URI |
-| DELETE | `/admin/apps/:id/redirect-uris/:uri_id` | Admin central session | Soft-delete redirect URI |
-| GET | `/admin/policies` | Admin central session | List access policies |
-| POST | `/admin/policies` | Admin central session | Create access policy |
-| GET | `/admin/policies/:id` | Admin central session | Get access policy |
-| PUT | `/admin/policies/:id` | Admin central session | Update access policy |
-| DELETE | `/admin/policies/:id` | Admin central session | Soft-delete access policy |
-| GET | `/admin/audit-logs` | Admin central session | List security audit records |
-| GET | `/admin/events` | Admin central session | List revocation events and deliveries |
+| GET | `/health` | Publik | Pemeriksaan readiness untuk kompatibilitas |
+| GET | `/health/live` | Publik | Liveness proses |
+| GET | `/health/ready` | Publik | Readiness PostgreSQL dan Kafka |
+| POST | `/login` | Publik | Mengautentikasi dan membuat sesi SSO pusat |
+| POST | `/logout` | Sesi pusat | Mencabut sesi SSO pusat |
+| POST | `/change-password` | Sesi pusat | Mengubah password dan mencabut akses terkait |
+| GET | `/profile` | Sesi pusat | Mengambil profil pusat saat ini |
+| GET | `/authorize` | Sesi pusat/parameter OAuth | Memulai atau melanjutkan authorization code flow |
+| POST | `/token` | OAuth client credential | Menukarkan code + PKCE verifier dengan opaque token |
+| GET | `/userinfo` | Opaque bearer token | Mengambil identitas/profil pemilik token |
+| GET | `/admin/users` | Sesi pusat admin | Menampilkan daftar pengguna |
+| POST | `/admin/users` | Sesi pusat admin | Membuat pengguna |
+| GET | `/admin/users/:id` | Sesi pusat admin | Mengambil detail pengguna |
+| PUT | `/admin/users/:id` | Sesi pusat admin | Memperbarui pengguna |
+| DELETE | `/admin/users/:id` | Sesi pusat admin | Menghapus pengguna secara soft-delete |
+| PATCH | `/admin/users/:id/status` | Sesi pusat admin | Mengaktifkan/menonaktifkan pengguna |
+| GET | `/admin/groups` | Sesi pusat admin | Menampilkan daftar grup |
+| POST | `/admin/groups` | Sesi pusat admin | Membuat grup |
+| GET | `/admin/groups/:id` | Sesi pusat admin | Mengambil grup beserta anggotanya |
+| PUT | `/admin/groups/:id` | Sesi pusat admin | Memperbarui grup |
+| DELETE | `/admin/groups/:id` | Sesi pusat admin | Menghapus grup secara soft-delete |
+| POST | `/admin/groups/:id/users` | Sesi pusat admin | Menambahkan pengguna ke grup |
+| DELETE | `/admin/groups/:id/users/:user_id` | Sesi pusat admin | Menghapus pengguna dari grup |
+| GET | `/admin/apps` | Sesi pusat admin | Menampilkan daftar aplikasi |
+| POST | `/admin/apps` | Sesi pusat admin | Mendaftarkan aplikasi dan menerbitkan secret sekali |
+| GET | `/admin/apps/:id` | Sesi pusat admin | Mengambil detail aplikasi |
+| PUT | `/admin/apps/:id` | Sesi pusat admin | Memperbarui aplikasi |
+| DELETE | `/admin/apps/:id` | Sesi pusat admin | Menghapus aplikasi secara soft-delete |
+| POST | `/admin/apps/:id/redirect-uris` | Sesi pusat admin | Menambahkan redirect URI persis |
+| DELETE | `/admin/apps/:id/redirect-uris/:uri_id` | Sesi pusat admin | Menghapus redirect URI secara soft-delete |
+| GET | `/admin/policies` | Sesi pusat admin | Menampilkan daftar kebijakan akses |
+| POST | `/admin/policies` | Sesi pusat admin | Membuat kebijakan akses |
+| GET | `/admin/policies/:id` | Sesi pusat admin | Mengambil detail kebijakan akses |
+| PUT | `/admin/policies/:id` | Sesi pusat admin | Memperbarui kebijakan akses |
+| DELETE | `/admin/policies/:id` | Sesi pusat admin | Menghapus kebijakan akses secara soft-delete |
+| GET | `/admin/audit-logs` | Sesi pusat admin | Menampilkan catatan audit keamanan |
+| GET | `/admin/events` | Sesi pusat admin | Menampilkan event pencabutan beserta delivery |
 
-### Apex and Bolt APIs — ports `8081` and `8082`
+### API Apex dan Bolt — port `8081` dan `8082`
 
-Both relying applications implement the same paths.
+Kedua relying application mengimplementasikan path yang sama.
 
-| Method | Path | Authentication | Purpose |
+| Method | Path | Autentikasi | Kegunaan |
 | --- | --- | --- | --- |
-| GET | `/health` | Public | Compatibility readiness check |
-| GET | `/health/live` | Public | Process liveness |
-| GET | `/health/ready` | Public | Local PostgreSQL readiness |
-| GET | `/auth/login` | Public | Generate OAuth state/PKCE and redirect to Auth Provider |
-| GET | `/auth/callback` | OAuth state + authorization code | Exchange code and create local session |
-| GET | `/session-status` | Optional local session | Return browser-facing session state |
-| POST | `/internal/logout` | Internal bearer secret | Idempotently process central revocation |
-| GET | `/me` | Local session | Return cached local profile |
-| GET | `/events` | Local session | Return local event state |
-| GET | `/activity` | Local session | Return local authentication activity |
-| POST | `/logout` | Local session | Revoke only the local application session |
+| GET | `/health` | Publik | Pemeriksaan readiness untuk kompatibilitas |
+| GET | `/health/live` | Publik | Liveness proses |
+| GET | `/health/ready` | Publik | Readiness PostgreSQL lokal |
+| GET | `/auth/login` | Publik | Membuat state OAuth/PKCE dan redirect ke Auth Provider |
+| GET | `/auth/callback` | OAuth state + authorization code | Menukarkan code dan membuat sesi lokal |
+| GET | `/session-status` | Sesi lokal opsional | Mengambil state sesi untuk browser |
+| POST | `/internal/logout` | Internal bearer secret | Memproses pencabutan pusat secara idempoten |
+| GET | `/me` | Sesi lokal | Mengambil profil lokal yang di-cache |
+| GET | `/events` | Sesi lokal | Mengambil state event lokal |
+| GET | `/activity` | Sesi lokal | Mengambil aktivitas autentikasi lokal |
+| POST | `/logout` | Sesi lokal | Mencabut sesi aplikasi lokal saja |
 
-### Sync Worker — internal port `8083`
+### Sync Worker — port internal `8083`
 
-| Method | Path | Authentication | Purpose |
+| Method | Path | Autentikasi | Kegunaan |
 | --- | --- | --- | --- |
-| GET | `/health/live` | Internal/public within network | Worker process liveness |
-| GET | `/health/ready` | Internal/public within network | PostgreSQL and Kafka readiness |
+| GET | `/health/live` | Internal/publik di dalam jaringan | Liveness proses worker |
+| GET | `/health/ready` | Internal/publik di dalam jaringan | Readiness PostgreSQL dan Kafka |
 
-## Bonus features
+## Fitur Bonus
 
-| Bonus | Status | Implementation |
+| Bonus | Status | Implementasi |
 | --- | --- | --- |
-| B01 | Not implemented | — |
-| B02 | Not implemented | — |
-| B03 | Complete | Distinct liveness/readiness probes with PostgreSQL/Kafka dependency checks and Compose health checks |
-| B04 | Complete | SIGINT/SIGTERM handling, graceful HTTP shutdown, bounded drain time, outbox cancellation, and resource closure across backend services |
+| B01 | Tidak diimplementasikan | — |
+| B02 | Tidak diimplementasikan | — |
+| B03 | Selesai | Probe liveness/readiness terpisah dengan pemeriksaan dependency PostgreSQL/Kafka dan health check Compose |
+| B04 | Selesai | Penanganan SIGINT/SIGTERM, graceful HTTP shutdown, batas waktu drain, pembatalan outbox, dan penutupan resource di seluruh layanan backend |
 
 ## Screenshots
 
-### Apex sign-in
+### Halaman Sign-in Apex
 
-![Apex sign-in](docs/screenshots/01-apex-sign-in.png)
+![Halaman sign-in Apex](docs/screenshots/01-apex-sign-in.png)
 
-### Central identity login
+### Login Identitas Terpusat
 
-![Central login](docs/screenshots/02-central-login.png)
+![Login terpusat](docs/screenshots/02-central-login.png)
 
-### Apex local session after OAuth 2.0 + PKCE
+### Sesi Lokal Apex Setelah OAuth 2.0 + PKCE
 
-![Apex dashboard](docs/screenshots/03-apex-dashboard.png)
+![Dashboard Apex](docs/screenshots/03-apex-dashboard.png)
 
-### Bolt using the existing central SSO session
+### Bolt Menggunakan Sesi SSO Pusat yang Sudah Aktif
 
-![Bolt SSO dashboard](docs/screenshots/04-bolt-sso-dashboard.png)
+![Dashboard SSO Bolt](docs/screenshots/04-bolt-sso-dashboard.png)
 
-### Administrative control panel
+### Control Panel Administratif
 
-![Admin control panel](docs/screenshots/05-admin-control-panel.png)
+![Control panel admin](docs/screenshots/05-admin-control-panel.png)
 
-### Asynchronously revoked relying-app session
+### Sesi Relying Application yang Dicabut Secara Asinkron
 
-![Revoked session](docs/screenshots/06-revoked-session.png)
+![Sesi dicabut](docs/screenshots/06-revoked-session.png)
